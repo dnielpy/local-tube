@@ -6,7 +6,7 @@ import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
-import { timeAgo } from "@/lib/format";
+import { formatBytes, formatDuration, timeAgo } from "@/lib/format";
 import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
 import { IconButton } from "./IconButton";
@@ -151,27 +151,49 @@ function JobRow({ job }: { job: DownloadJob }) {
   const active = isActiveJob(job);
   const watchHref = job.video_id ? `/watch?v=${job.video_id}` : null;
 
+  const image =
+    job.video_id && job.status === "completed"
+      ? `/api/videos/${job.video_id}/thumbnail`
+      : job.thumbnail_url;
+  const badge = [
+    formatBytes(job.size_bytes),
+    job.duration_seconds ? formatDuration(job.duration_seconds) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const thumbnail = (
     <div className="relative aspect-video w-[120px] shrink-0 overflow-hidden rounded-lg bg-yt-surface xs:w-[168px]">
-      {job.video_id && job.status === "completed" ? (
+      {image ? (
         <img
-          src={`/api/videos/${job.video_id}/thumbnail`}
+          src={image}
           alt=""
-          className="absolute inset-0 size-full object-cover"
+          className={`absolute inset-0 size-full object-cover transition-[filter,opacity] duration-300 ${
+            active ? "opacity-60 brightness-75" : job.status === "failed" ? "opacity-40" : ""
+          }`}
           onError={(event) => (event.currentTarget.style.display = "none")}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-yt-text-secondary">
-          {job.status === "failed" ? <AlertIcon size={32} /> : <DownloadIcon size={32} />}
-        </div>
+        !active && (
+          <div className="absolute inset-0 flex items-center justify-center text-yt-text-secondary">
+            {job.status === "failed" ? <AlertIcon size={32} /> : <DownloadIcon size={32} />}
+          </div>
+        )
       )}
       {active && (
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-[#717171]/60">
-          <div
-            className="h-full bg-yt-brand transition-[width] duration-500"
-            style={{ width: `${job.status === "queued" ? 0 : job.progress}%` }}
-          />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ProgressCircle job={job} />
         </div>
+      )}
+      {job.status === "failed" && image && (
+        <div className="absolute inset-0 flex items-center justify-center text-white">
+          <AlertIcon size={32} />
+        </div>
+      )}
+      {badge && (
+        <span className="absolute right-1 bottom-1 rounded bg-black/80 px-1 py-[1px] text-xs leading-[18px] font-medium text-white">
+          {badge}
+        </span>
       )}
     </div>
   );
@@ -242,5 +264,57 @@ function JobRow({ job }: { job: DownloadJob }) {
         )}
       </div>
     </li>
+  );
+}
+
+const RING = 44;
+const RING_STROKE = 3;
+const RING_RADIUS = (RING - RING_STROKE) / 2;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+
+function ProgressCircle({ job }: { job: DownloadJob }) {
+  const indeterminate = job.status !== "downloading" || job.progress <= 0;
+  const progress = Math.min(Math.max(job.progress, 0), 100);
+  return (
+    <div
+      className="relative flex size-11 items-center justify-center"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={indeterminate ? undefined : Math.round(progress)}
+      aria-label="Progreso de la descarga"
+    >
+      <svg
+        viewBox={`0 0 ${RING} ${RING}`}
+        className={`absolute inset-0 -rotate-90 ${indeterminate ? "[animation:yt-spin_1s_linear_infinite]" : ""}`}
+        aria-hidden="true"
+      >
+        <circle
+          cx={RING / 2}
+          cy={RING / 2}
+          r={RING_RADIUS}
+          fill="none"
+          strokeWidth={RING_STROKE}
+          stroke="rgba(255,255,255,0.3)"
+        />
+        <circle
+          cx={RING / 2}
+          cy={RING / 2}
+          r={RING_RADIUS}
+          fill="none"
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          stroke="#3ea6ff"
+          strokeDasharray={RING_LENGTH}
+          strokeDashoffset={indeterminate ? RING_LENGTH * 0.75 : RING_LENGTH * (1 - progress / 100)}
+          className="transition-[stroke-dashoffset] duration-700 ease-out"
+        />
+      </svg>
+      <span className="flex size-8 items-center justify-center rounded-full bg-[#3ea6ff] text-white shadow-md">
+        <span className={job.status === "downloading" ? "animate-lt-nudge" : ""}>
+          <DownloadIcon size={20} />
+        </span>
+      </span>
+    </div>
   );
 }

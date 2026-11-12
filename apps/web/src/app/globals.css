@@ -202,6 +202,17 @@ body {
   --animate-lt-drop: lt-drop 0.45s ease-out;
   --animate-lt-bounce: lt-bounce 0.6s ease-out 0.35s;
   --animate-lt-ping: lt-ping 0.8s ease-out forwards;
+  --animate-lt-nudge: lt-nudge 1.4s ease-in-out infinite;
+
+  @keyframes lt-nudge {
+    0%,
+    100% {
+      transform: translateY(-2px);
+    }
+    50% {
+      transform: translateY(2px);
+    }
+  }
 
   @keyframes lt-drop {
     0% {

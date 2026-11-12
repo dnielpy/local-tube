@@ -144,6 +144,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/downloads/{job_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["download_thumbnail_api_downloads__job_id__thumbnail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/downloads/{job_id}/retry": {
         parameters: {
             query?: never;
@@ -320,9 +336,12 @@ export interface components {
             error: string | null;
             title: string | null;
             max_height: number | null;
+            duration_seconds: number | null;
+            size_bytes: number | null;
             video_id: string | null;
             created_at: string;
             updated_at: string;
+            readonly thumbnail_url: string | null;
         };
         HTTPValidationError: {
             detail?: components["schemas"]["ValidationError"][];
@@ -706,6 +725,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_thumbnail_api_downloads__job_id__thumbnail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             422: {
                 headers: {
