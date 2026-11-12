@@ -96,6 +96,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/downloads/formats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["video_formats_api_downloads_formats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/downloads": {
         parameters: {
             query?: never;
@@ -312,6 +328,10 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         JobStatus: "queued" | "downloading" | "processing" | "completed" | "failed";
+        QualityOut: {
+            height: number;
+            size_bytes: number | null;
+        };
         RemoteVideoOut: {
             youtube_id: string;
             title: string;
@@ -337,6 +357,15 @@ export interface components {
             type: string;
             input?: unknown;
             ctx?: Record<string, never>;
+        };
+        VideoFormatsOut: {
+            youtube_id: string;
+            title: string;
+            channel: string | null;
+            duration_seconds: number | null;
+            qualities: components["schemas"]["QualityOut"][];
+            default_height: number | null;
+            video_id: string | null;
         };
         VideoOut: {
             id: string;
@@ -540,6 +569,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    video_formats_api_downloads_formats_get: {
+        parameters: {
+            query: {
+                url: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoFormatsOut"];
                 };
             };
             422: {

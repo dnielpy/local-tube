@@ -5,10 +5,11 @@ import Link from "next/link";
 import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import { browser } from "react-dom";
 
-import { api, ApiError, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
+import { api, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 
 import { IconButton } from "./IconButton";
+import { QualityDialog } from "./QualityDialog";
 import { AlertIcon, CheckIcon, CloseIcon, DownloadIcon, RetryIcon, TrashIcon } from "./icons";
 
 const ACTIVE: JobStatus[] = ["queued", "downloading", "processing"];
@@ -71,40 +72,19 @@ export function Downloads() {
   );
 }
 
-const QUALITIES: { label: string; value: number | null }[] = [
-  { label: "360p", value: 360 },
-  { label: "480p", value: 480 },
-  { label: "720p", value: 720 },
-  { label: "1080p", value: 1080 },
-  { label: "Máxima", value: null },
-];
-
 function DownloadForm() {
-  const client = useQueryClient();
   const [url, setUrl] = useState("");
-  const [maxHeight, setMaxHeight] = useState<number | null>(360);
-  const create = useMutation({
-    mutationFn: api.createDownload,
-    onSuccess: () => {
-      setUrl("");
-      client.invalidateQueries({ queryKey: queryKeys.downloads });
-    },
-  });
+  const [dialogUrl, setDialogUrl] = useState<string | null>(null);
+
+  function open(value: string) {
+    const trimmed = value.trim();
+    if (trimmed) setDialogUrl(trimmed);
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (url.trim()) create.mutate({ url: url.trim(), maxHeight });
+    open(url);
   }
-
-  const error = create.error;
-  const existingVideo =
-    error instanceof ApiError &&
-    error.status === 409 &&
-    typeof error.detail === "object" &&
-    error.detail !== null &&
-    "video_id" in error.detail
-      ? String(error.detail.video_id)
-      : null;
 
   return (
     <form onSubmit={submit} className="mt-6">
@@ -112,16 +92,13 @@ function DownloadForm() {
         <div className="flex h-10 flex-1 items-center rounded-full border border-yt-border bg-yt-search-bg pr-1 pl-4 focus-within:border-[#1c62b9]">
           <input
             value={url}
-            onChange={(event) => {
-              setUrl(event.target.value);
-              if (create.isError) create.reset();
-            }}
+            onChange={(event) => setUrl(event.target.value)}
             onPaste={(event) => {
               const pasted = event.clipboardData.getData("text").trim();
               if (pasted && !url) {
                 event.preventDefault();
                 setUrl(pasted);
-                create.mutate({ url: pasted, maxHeight });
+                open(pasted);
               }
             }}
             type="url"
@@ -142,44 +119,24 @@ function DownloadForm() {
             </button>
           )}
         </div>
-        <select
-          value={maxHeight ?? "best"}
-          onChange={(event) =>
-            setMaxHeight(event.target.value === "best" ? null : Number(event.target.value))
-          }
-          aria-label="Calidad"
-          className="h-10 cursor-pointer rounded-full bg-yt-surface px-4 text-sm font-medium outline-none hover:bg-yt-surface-hover [&>option]:bg-yt-menu"
-        >
-          {QUALITIES.map((quality) => (
-            <option key={quality.label} value={quality.value ?? "best"}>
-              {quality.label}
-            </option>
-          ))}
-        </select>
         <button
           type="submit"
-          disabled={!url.trim() || create.isPending}
+          disabled={!url.trim()}
           className="flex h-10 items-center justify-center gap-2 rounded-full bg-yt-cta-bg px-5 text-sm font-medium text-yt-cta-text hover:bg-yt-cta-hover disabled:opacity-50"
         >
           <DownloadIcon />
-          {create.isPending ? "Añadiendo…" : "Descargar"}
+          Descargar
         </button>
       </div>
-      {error && (
-        <p className="mt-3 flex items-center gap-2 text-sm text-yt-error">
-          <AlertIcon size={20} />
-          {error.message}
-          {existingVideo && (
-            <Link href={`/watch?v=${existingVideo}`} className="font-medium text-yt-link">
-              Verlo
-            </Link>
-          )}
-        </p>
-      )}
       <p className="mt-3 text-xs text-yt-text-secondary">
-        Al pegar un enlace la descarga empieza sola. Los videos se guardan en MP4 (H.264) para que
-        se puedan ver en cualquier dispositivo.
+        Al pegar un enlace se analizan las calidades disponibles para que elijas cuál descargar. Los
+        videos se guardan en MP4 (H.264) para que se puedan ver en cualquier dispositivo.
       </p>
+      <QualityDialog
+        url={dialogUrl}
+        onClose={() => setDialogUrl(null)}
+        onQueued={() => setUrl("")}
+      />
     </form>
   );
 }

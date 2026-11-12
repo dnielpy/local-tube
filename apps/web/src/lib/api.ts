@@ -9,6 +9,7 @@ export type ChannelList = components["schemas"]["ChannelList"];
 export type ChannelDetail = components["schemas"]["ChannelDetail"];
 export type RemoteVideo = components["schemas"]["RemoteVideoOut"];
 export type Status = components["schemas"]["StatusOut"];
+export type VideoFormats = components["schemas"]["VideoFormatsOut"];
 
 export class ApiError extends Error {
   constructor(
@@ -62,6 +63,8 @@ export const api = {
   video: (id: string) => request<Video>(`/videos/${id}`),
   deleteVideo: (id: string) => request<void>(`/videos/${id}`, { method: "DELETE" }),
   downloads: () => request<DownloadJob[]>("/downloads"),
+  formats: (url: string) =>
+    request<VideoFormats>(`/downloads/formats?url=${encodeURIComponent(url)}`),
   createDownload: ({ url, maxHeight }: { url: string; maxHeight: number | null }) =>
     request<DownloadJob>("/downloads", {
       method: "POST",
@@ -81,4 +84,5 @@ export const queryKeys = {
   allChannels: ["channel"] as const,
   video: (id: string) => ["video", id] as const,
   downloads: ["downloads"] as const,
+  formats: (url: string) => ["formats", url] as const,
 };

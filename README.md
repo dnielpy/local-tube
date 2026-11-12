@@ -22,7 +22,7 @@ LocalTube is now at `http://<server-ip>` (or the `PORT` you chose). Caddy is the
 
 Videos are saved under `MEDIA_PATH/<youtube id>/video.mp4`, next to their `thumbnail.jpg`. The database stores the paths relative to that folder, so the drive can be mounted somewhere else later.
 
-Videos download at 360p by default. The downloads page has a quality selector (360p, 480p, 720p, 1080p or the best available), and `DEFAULT_MAX_HEIGHT` changes the default for requests that do not say.
+Before a download starts, LocalTube analyzes the video (`GET /api/downloads/formats`) and opens a dialog with every resolution YouTube offers and its approximate size. The sizes come from the same yt-dlp format selection the download uses. 360p is preselected; `DEFAULT_MAX_HEIGHT` changes that default, which also applies to API requests that do not choose a quality.
 
 ### YouTube cookies
 

@@ -2,11 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 
-import { api, ApiError, queryKeys, type DownloadJob, type RemoteVideo } from "@/lib/api";
+import { api, queryKeys, type DownloadJob, type RemoteVideo } from "@/lib/api";
 import { formatCount, formatDuration, timeAgo } from "@/lib/format";
 
 import { CheckIcon, DownloadIcon, ExternalIcon, RetryIcon } from "./icons";
+import { QualityDialog } from "./QualityDialog";
 
 const ACTIVE = new Set(["queued", "downloading", "processing"]);
 
@@ -32,15 +34,7 @@ export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; chan
   const localId = video.video_id ?? (job?.status === "completed" ? job.video_id : null);
   const active = job && ACTIVE.has(job.status);
 
-  const download = useMutation({
-    mutationFn: () => api.createDownload({ url: video.youtube_url, maxHeight: 360 }),
-    onSettled: () => client.invalidateQueries({ queryKey: queryKeys.downloads }),
-    onError: (error) => {
-      if (error instanceof ApiError && error.status === 409) {
-        client.invalidateQueries({ queryKey: queryKeys.channel(channelId) });
-      }
-    },
-  });
+  const [choosing, setChoosing] = useState(false);
   const retry = useMutation({
     mutationFn: (id: string) => api.retryDownload(id),
     onSettled: () => client.invalidateQueries({ queryKey: queryKeys.downloads }),
@@ -138,9 +132,8 @@ export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; chan
               ) : (
                 <button
                   type="button"
-                  disabled={download.isPending}
-                  onClick={() => download.mutate()}
-                  className={`${pill} bg-yt-cta-bg text-yt-cta-text hover:bg-yt-cta-hover disabled:opacity-50`}
+                  onClick={() => setChoosing(true)}
+                  className={`${pill} bg-yt-cta-bg text-yt-cta-text hover:bg-yt-cta-hover`}
                 >
                   <DownloadIcon size={18} />
                   Descargar
@@ -150,6 +143,11 @@ export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; chan
           )}
         </div>
       </div>
+      <QualityDialog
+        url={choosing ? video.youtube_url : null}
+        onClose={() => setChoosing(false)}
+        onQueued={() => client.invalidateQueries({ queryKey: queryKeys.channel(channelId) })}
+      />
     </div>
   );
 }
