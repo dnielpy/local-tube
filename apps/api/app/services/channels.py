@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 SUBSCRIPTIONS_TTL = timedelta(hours=24)
 CHANNEL_TTL = timedelta(hours=6)
+AVATAR_CONCURRENCY = 8
 SUBSCRIPTIONS_SYNCED_KEY = "subscriptions_synced_at"
 
 
@@ -94,19 +95,32 @@ class ChannelService:
                 return False
 
             async with SessionLocal() as session:
-                await session.execute(update(Channel).values(subscribed=False))
-                for item in remote:
+                await session.execute(
+                    update(Channel).values(subscribed=False, subscription_rank=None)
+                )
+                for rank, item in enumerate(remote):
                     channel = await session.get(Channel, item.id)
                     if channel is None:
                         channel = Channel(id=item.id, name=item.name)
                         session.add(channel)
                     channel.name = item.name
                     channel.handle = item.handle or channel.handle
+                    channel.description = item.description or channel.description
                     channel.subscriber_count = item.subscriber_count or channel.subscriber_count
                     channel.subscribed = True
-                    await self._cache_avatar(channel, item.avatar_url)
+                    channel.subscription_rank = rank
                 await session.commit()
             await write_setting(SUBSCRIPTIONS_SYNCED_KEY, _now().isoformat())
+
+            semaphore = asyncio.Semaphore(AVATAR_CONCURRENCY)
+
+            async def cache(item: RemoteChannel) -> None:
+                async with semaphore, SessionLocal() as session:
+                    channel = await session.get_one(Channel, item.id)
+                    await self._cache_avatar(channel, item.avatar_url)
+                    await session.commit()
+
+            await asyncio.gather(*(cache(item) for item in remote))
             return True
 
     async def refresh_channel(self, channel_id: str, force: bool = False) -> bool:

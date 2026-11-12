@@ -68,7 +68,9 @@ async def _subscribed_channels(session: SessionDep) -> list[ChannelOut]:
         ).all()
     )
     channels = await session.scalars(
-        select(Channel).where(Channel.subscribed.is_(True)).order_by(func.lower(Channel.name))
+        select(Channel)
+        .where(Channel.subscribed.is_(True))
+        .order_by(Channel.subscription_rank, func.lower(Channel.name))
     )
     return [
         ChannelOut(

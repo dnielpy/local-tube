@@ -50,6 +50,7 @@ class Channel(Base):
     banner_path: Mapped[str | None] = mapped_column(Text)
     banner_source_url: Mapped[str | None] = mapped_column(Text)
     subscribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    subscription_rank: Mapped[int | None] = mapped_column(Integer)
     videos_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

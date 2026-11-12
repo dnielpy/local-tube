@@ -28,6 +28,7 @@ async def test_online_lists_subscriptions_with_cached_avatars(
     assert first["syncing"] is True
     assert second["syncing"] is False
     assert [c["name"] for c in body] == ["Alpha", "beta"]
+    assert [c["handle"] for c in body] == ["@alpha", "@beta"]
     assert all(c["subscribed"] for c in body)
     avatar = await client.get(body[0]["avatar_url"])
     assert avatar.status_code == 200
