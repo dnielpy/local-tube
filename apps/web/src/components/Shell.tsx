@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState, type ReactNode } from "reac
 import { Drawer, FullGuide, MiniGuide } from "./Guide";
 import { Header } from "./Header";
 import { ProfileGate, ProfileGateFallback } from "./profiles/ProfileGate";
+import { TopLoadingBar } from "./TopLoadingBar";
 
 const onWatchPage = () => document.querySelector("[data-watch]") !== null;
 
@@ -21,27 +22,32 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <Suspense fallback={<ProfileGateFallback />}>
-      <ProfileGate>
-        <div className="group/shell" data-guide={expanded ? "expanded" : "mini"}>
-          <Suspense fallback={<div className="h-14" />}>
-            <Header onMenu={toggleGuide} />
-          </Suspense>
-          <Suspense>
-            <FullGuide className="hidden guide:group-data-[guide=expanded]/shell:block group-has-[[data-watch]]/shell:hidden!" />
-          </Suspense>
-          <Suspense>
-            <MiniGuide className="hidden mini:flex guide:group-data-[guide=expanded]/shell:hidden group-has-[[data-watch]]/shell:hidden!" />
-          </Suspense>
-          <Suspense>
-            <RouteDrawer open={drawerOpen} onClose={closeDrawer} />
-          </Suspense>
-          <main className="pt-14 mini:pl-[72px] guide:group-data-[guide=expanded]/shell:pl-[240px] group-has-[[data-watch]]/shell:pl-0!">
-            {children}
-          </main>
-        </div>
-      </ProfileGate>
-    </Suspense>
+    <>
+      <Suspense>
+        <TopLoadingBar />
+      </Suspense>
+      <Suspense fallback={<ProfileGateFallback />}>
+        <ProfileGate>
+          <div className="group/shell" data-guide={expanded ? "expanded" : "mini"}>
+            <Suspense fallback={<div className="h-14" />}>
+              <Header onMenu={toggleGuide} />
+            </Suspense>
+            <Suspense>
+              <FullGuide className="hidden guide:group-data-[guide=expanded]/shell:block group-has-[[data-watch]]/shell:hidden!" />
+            </Suspense>
+            <Suspense>
+              <MiniGuide className="hidden mini:flex guide:group-data-[guide=expanded]/shell:hidden group-has-[[data-watch]]/shell:hidden!" />
+            </Suspense>
+            <Suspense>
+              <RouteDrawer open={drawerOpen} onClose={closeDrawer} />
+            </Suspense>
+            <main className="pt-14 mini:pl-[72px] guide:group-data-[guide=expanded]/shell:pl-[240px] group-has-[[data-watch]]/shell:pl-0!">
+              {children}
+            </main>
+          </div>
+        </ProfileGate>
+      </Suspense>
+    </>
   );
 }
 
