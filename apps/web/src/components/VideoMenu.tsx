@@ -8,7 +8,6 @@ import { useDeleteVideo } from "@/lib/use-delete-video";
 import { ConfirmDialog } from "./Dialog";
 import { ExternalIcon, MoreIcon, TrashIcon } from "./icons";
 
-/** The ⋮ menu on a video card. */
 export function VideoMenu({ video, className = "" }: { video: Video; className?: string }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);

@@ -8,7 +8,6 @@ import { timeAgo } from "@/lib/format";
 import { Thumbnail } from "./Thumbnail";
 import { useWatchedFraction } from "./VideoCard";
 
-/** The compact list beside the player on youtube.com's watch page. */
 export function WatchNext({ videos }: { videos: Video[] }) {
   if (videos.length === 0) return null;
   return (

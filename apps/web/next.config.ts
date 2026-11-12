@@ -1,7 +1,5 @@
 import type { NextConfig } from "next";
 
-// In development the browser talks to `next dev`, which forwards /api to FastAPI.
-// In production Caddy routes /api straight to the api container instead.
 const apiUrl = process.env.API_URL ?? "http://localhost:8000";
 
 const nextConfig: NextConfig = {

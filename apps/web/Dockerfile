@@ -1,4 +1,3 @@
-# Built from the repository root: docker build -f apps/web/Dockerfile .
 FROM node:24-bookworm-slim AS build
 RUN npm install -g pnpm@11.25.0
 WORKDIR /repo

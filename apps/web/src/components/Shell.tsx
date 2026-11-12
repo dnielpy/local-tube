@@ -6,10 +6,6 @@ import { Suspense, useCallback, useState, type ReactNode } from "react";
 import { Drawer, FullGuide, MiniGuide } from "./Guide";
 import { Header } from "./Header";
 
-/**
- * youtube.com layout: a 56px header, a 240px guide from 1313px wide (collapsible to the 72px
- * mini guide), the mini guide from 792px, and an overlay drawer below that or on the watch page.
- */
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isWatch = pathname.startsWith("/watch");
@@ -23,7 +19,6 @@ export function Shell({ children }: { children: ReactNode }) {
     else setDrawerOpen((value) => !value);
   }, [isWatch]);
 
-  // Close the drawer after navigating from it.
   if (drawerPath !== pathname) {
     setDrawerPath(pathname);
     setDrawerOpen(false);

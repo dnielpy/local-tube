@@ -15,7 +15,6 @@ import { Thumbnail } from "./Thumbnail";
 import { useWatchedFraction } from "./VideoCard";
 import { VideoMenu } from "./VideoMenu";
 
-/** youtube.com's /results page: one row per video, thumbnail on the left. */
 export function SearchResults() {
   use(browser("Library data is fetched from the api in the browser."));
   const query = useSearchParams().get("search_query") ?? "";

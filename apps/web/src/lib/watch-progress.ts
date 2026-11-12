@@ -1,4 +1,3 @@
-// Per-viewer playback position, so videos resume where they were left like on youtube.com.
 const key = (id: string) => `localtube:position:${id}`;
 
 export function readPosition(id: string): { time: number; duration: number } | null {

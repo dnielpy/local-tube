@@ -4,10 +4,6 @@ import { useRef, useState, type PointerEvent } from "react";
 
 import { formatDuration } from "@/lib/format";
 
-/**
- * youtube.com's scrubber: a 3px bar that grows to 5px on hover, grey buffered and hover
- * layers under the red played part, a red knob and a time bubble following the cursor.
- */
 export function ProgressBar({
   current,
   duration,
@@ -50,7 +46,6 @@ export function ProgressBar({
   const played = dragging ?? (duration ? current / duration : 0);
   const bufferedFraction = duration ? buffered / duration : 0;
   const bubble = dragging ?? hover;
-  // Keep the bubble inside the player near the edges.
   const bubbleLeft = Math.min(Math.max((bubble ?? 0) * width, 24), Math.max(width - 24, 24));
 
   return (
@@ -69,7 +64,6 @@ export function ProgressBar({
       onPointerUp={onPointerUp}
       onPointerLeave={() => setHover(null)}
     >
-      {/* Taller invisible hit area, like youtube.com's. */}
       <div className="absolute inset-x-0 -top-2 -bottom-1" />
       <div
         className={`absolute inset-x-0 bottom-0 h-[3px] bg-white/20 transition-[height] duration-100 group-hover/progress:h-[5px] ${

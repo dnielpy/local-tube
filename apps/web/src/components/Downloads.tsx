@@ -23,7 +23,6 @@ export function Downloads() {
     refetchInterval: (query) => (query.state.data?.some(isActive) ? 1500 : false),
   });
 
-  // When a download finishes, the library and channel list have something new.
   const finished = jobs.data?.filter((job) => job.status === "completed").length ?? 0;
   const seen = useRef(finished);
   useEffect(() => {

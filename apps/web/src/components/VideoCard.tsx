@@ -13,7 +13,6 @@ import { VideoMenu } from "./VideoMenu";
 
 const noSubscribe = () => () => {};
 
-/** Read the saved playback position only in the browser, so the server render stays stable. */
 export function useWatchedFraction(id: string) {
   return useSyncExternalStore(
     noSubscribe,
@@ -22,7 +21,6 @@ export function useWatchedFraction(id: string) {
   );
 }
 
-/** A tile of the home grid, laid out like youtube.com's rich grid item. */
 export function VideoCard({ video }: { video: Video }) {
   const watched = useWatchedFraction(video.id);
   const href = `/watch?v=${video.id}`;

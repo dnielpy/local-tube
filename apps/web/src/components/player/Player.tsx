@@ -74,8 +74,6 @@ export function Player({
     setToast({ id: Date.now(), text, side });
   }, []);
 
-  // ---- playback actions -------------------------------------------------------------------
-
   const togglePlay = useCallback(() => {
     const v = el();
     if (!v) return;
@@ -139,12 +137,9 @@ export function Player({
     } else if (container.requestFullscreen) {
       container.requestFullscreen().catch(() => {});
     } else {
-      // iOS Safari only lets the <video> element itself go fullscreen.
       v?.webkitEnterFullscreen?.();
     }
   }, []);
-
-  // ---- controls auto-hide -----------------------------------------------------------------
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
@@ -157,8 +152,6 @@ export function Player({
   useEffect(() => () => clearTimeout(hideTimer.current), []);
 
   const showAll = !playing || settingsOpen || controlsVisible;
-
-  // ---- media element setup ----------------------------------------------------------------
 
   useEffect(() => {
     const v = el();
@@ -211,8 +204,6 @@ export function Player({
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
-
-  // ---- keyboard shortcuts (the same ones youtube.com uses) --------------------------------
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -307,8 +298,6 @@ export function Player({
     showControls,
   ]);
 
-  // ---- touch: tap shows controls, double tap on a side skips 10 seconds -------------------
-
   const lastTap = useRef(0);
   function onSurfacePointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "mouse") return;
@@ -341,8 +330,7 @@ export function Player({
         fullscreen
           ? "h-full w-full"
           : theater
-            ? // Theater layout only exists from 1017px; below that it is the normal player.
-              "aspect-video w-full search:rounded-xl watch:aspect-auto watch:h-full watch:rounded-none"
+            ? "aspect-video w-full search:rounded-xl watch:aspect-auto watch:h-full watch:rounded-none"
             : "aspect-video w-full search:rounded-xl"
       } ${showAll ? "" : "cursor-none"}`}
       onMouseMove={showControls}
@@ -375,11 +363,9 @@ export function Player({
         onRateChange={(event) => setRate(event.currentTarget.playbackRate)}
       />
 
-      {/* Click surface: click toggles play, double click toggles fullscreen. */}
       <div
         className="absolute inset-0"
         onClick={(event) => {
-          // Touch is handled in onPointerUp; a tap there only shows the controls.
           const pointer = (event.nativeEvent as PointerEvent).pointerType;
           if (pointer && pointer !== "mouse") return;
           if (settingsOpen) setSettingsOpen(false);
@@ -422,7 +408,6 @@ export function Player({
         </div>
       )}
 
-      {/* Bottom chrome: gradient, progress bar and the control row. */}
       <div
         className={`absolute inset-x-0 bottom-0 transition-opacity duration-200 ${
           showAll ? "opacity-100" : "pointer-events-none opacity-0"

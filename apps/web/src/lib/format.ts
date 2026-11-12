@@ -18,7 +18,6 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["minute", 60],
 ];
 
-/** "hace 3 días", the way youtube.com writes upload dates. */
 export function timeAgo(iso: string, now: number = Date.now()): string {
   const seconds = Math.max(0, (now - new Date(iso).getTime()) / 1000);
   for (const [unit, size] of UNITS) {
@@ -47,7 +46,6 @@ export function formatBytes(bytes: number | null | undefined): string | null {
   return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
-/** Stable avatar colour per channel, since there are no channel pictures. */
 export function channelColor(name: string | null | undefined): string {
   let hash = 0;
   for (const char of name ?? "") hash = (hash * 31 + char.charCodeAt(0)) | 0;

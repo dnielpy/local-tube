@@ -21,7 +21,6 @@ function icon(path: string, viewBox = "0 0 24 24") {
   return Icon;
 }
 
-// Guide and header icons, 24px, matching the outlined set youtube.com uses.
 export const MenuIcon = icon("M21 6H3V5h18v1zm0 5H3v1h18v-1zm0 6H3v1h18v-1z");
 export const HomeIcon = icon(
   "M12 4.44l7 6.09V20h-4v-6H9v6H5v-9.47l7-6.09m0-1.32l-8 6.96V21h6v-6h4v6h6V10.08l-8-6.96z",
@@ -67,7 +66,6 @@ export const LibraryIcon = icon(
   "M11 7l6 3.5-6 3.5V7zm7 13H4V6H3v15h15v-1zm3-2H6V3h15v15zM7 17h13V4H7v13z",
 );
 
-// Player icons use youtube.com's 36px grid.
 const PLAYER = "0 0 36 36";
 export const PlayIcon = icon(
   "M 12,26 18.5,22 18.5,14 12,10 z M 18.5,22 25,18 25,18 18.5,14 z",
@@ -115,7 +113,6 @@ export const SpeedIcon = icon(
   "M10,8v8l6-4L10,8L10,8z M6.3,5L5.7,4.2C7.2,3,9,2.2,11,2l0.1,1C9.3,3.2,7.7,3.9,6.3,5z M5,6.3L4.2,5.7C3,7.2,2.2,9,2,11 l1,.1C3.2,9.3,3.9,7.7,5,6.3z M5,17.7c-1.1-1.4-1.8-3.1-2-4.8L2,13c0.2,2,1,3.8,2.2,5.4L5,17.7z M11.1,21c-1.8-0.2-3.4-0.9-4.8-2 l-0.6,.8C7.2,21,9,21.8,11,22L11.1,21z M22,12c0-5.2-3.9-9.4-9-10l-0.1,1c4.6,.5,8.1,4.3,8.1,9s-3.5,8.5-8.1,9l0.1,1 C18.2,21.5,22,17.2,22,12z",
 );
 
-/** The play-button logo with the LocalTube wordmark, laid out like youtube.com's header logo. */
 export function Logo() {
   return (
     <span className="flex items-center gap-[2px]">

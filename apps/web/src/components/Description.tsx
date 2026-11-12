@@ -23,7 +23,6 @@ function Linkified({ text }: { text: string }) {
   );
 }
 
-/** The grey description box under the player, collapsed to a few lines with "...más". */
 export function Description({ video }: { video: Video }) {
   const [expanded, setExpanded] = useState(false);
   const size = formatBytes(video.file_size);

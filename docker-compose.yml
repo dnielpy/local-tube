@@ -1,5 +1,3 @@
-# Its own project name, so it never touches the containers of docker-compose.dev.yml,
-# which lives in the same folder.
 name: localtube
 
 services:
@@ -29,7 +27,6 @@ services:
       COOKIES_FILE: /config/cookies.txt
     volumes:
       - ${MEDIA_PATH:?set MEDIA_PATH in .env}:/media
-      # Writable because yt-dlp saves the refreshed cookies back to the file.
       - ${COOKIES_PATH:-./config/cookies.txt}:/config/cookies.txt
     depends_on:
       postgres:

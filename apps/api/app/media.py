@@ -5,7 +5,6 @@ from app.config import get_settings
 
 
 def media_path(relative: str) -> Path:
-    """Resolve a path stored in the database, refusing anything outside the media root."""
     root = get_settings().media_root.resolve()
     path = (root / relative).resolve()
     if not path.is_relative_to(root):

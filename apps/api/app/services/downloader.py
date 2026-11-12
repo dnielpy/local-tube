@@ -1,5 +1,3 @@
-"""Thin wrapper around yt-dlp. Everything here is blocking and runs in a worker thread."""
-
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,18 +11,16 @@ ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def format_selector(max_height: int | None) -> str:
-    """Prefer H.264 + AAC in an mp4 so every browser plays the file without transcoding,
-    capped at max_height, falling back to whatever exists when that is not available."""
     cap = f"[height<={max_height}]" if max_height else ""
     return f"bv*{cap}[ext=mp4][vcodec^=avc]+ba[ext=m4a]/b{cap}[ext=mp4]/bv*{cap}+ba/b{cap}/b"
 
 
 @dataclass
 class Progress:
-    status: str  # "downloading" | "processing"
+    status: str
     percent: float | None = None
-    speed: float | None = None  # bytes per second
-    eta: int | None = None  # seconds
+    speed: float | None = None
+    eta: int | None = None
 
 
 @dataclass
@@ -42,7 +38,7 @@ class DownloadResult:
     channel: str | None
     duration_seconds: int | None
     youtube_url: str
-    file_path: str  # relative to the media root
+    file_path: str
     thumbnail_path: str | None
     file_size: int | None
 
@@ -52,7 +48,6 @@ class DownloadError(Exception):
 
 
 def parse_youtube_id(url: str) -> str | None:
-    """Return the YouTube video id from a URL without hitting the network, if it is one."""
     if not YoutubeIE.suitable(url):
         return None
     return YoutubeIE.get_temp_id(url)
@@ -91,7 +86,6 @@ class YtDlpDownloader:
                 {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"}
             ],
         }
-        # A bind mount of a missing host file shows up as a directory, so check for a file.
         if self.cookies_file and Path(self.cookies_file).is_file():
             options["cookiefile"] = self.cookies_file
         elif self.cookies_from_browser:
@@ -145,8 +139,6 @@ class YtDlpDownloader:
 
 
 def _progress_hook(on_progress: Callable[[Progress], None]) -> Callable[[dict[str, Any]], None]:
-    # Video and audio are downloaded as separate files and then merged, so spread the
-    # percentage across all requested formats instead of restarting at 0 for the audio.
     finished = 0
 
     def hook(d: dict[str, Any]) -> None:

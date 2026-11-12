@@ -1,7 +1,5 @@
 FROM python:3.12-slim
 
-# ffmpeg merges the video and audio streams; deno is the JavaScript runtime yt-dlp
-# needs to solve YouTube's player challenges.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
     && rm -rf /var/lib/apt/lists/*

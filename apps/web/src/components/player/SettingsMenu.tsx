@@ -6,7 +6,6 @@ import { BackIcon, CheckIcon, ChevronRightIcon, SpeedIcon } from "../icons";
 
 const speedLabel = (rate: number) => (rate === 1 ? "Normal" : String(rate));
 
-/** The gear popup: a main panel with the speed row and a nested speed list. */
 export function SettingsMenu({
   open,
   rate,

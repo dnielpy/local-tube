@@ -41,8 +41,6 @@ QUALITIES = (144, 240, 360, 480, 720, 1080, 1440, 2160)
 
 class DownloadCreate(BaseModel):
     url: str
-    # Maximum video height in pixels; null downloads the best quality available.
-    # Left out, the server default (360p) applies.
     max_height: int | None = None
 
     @field_validator("max_height")

@@ -1,5 +1,3 @@
-"""Background download queue backed by the download_jobs table."""
-
 import asyncio
 import contextlib
 import logging
@@ -66,7 +64,6 @@ class DownloadWorker:
                     await asyncio.wait_for(self._wakeup.wait(), IDLE_POLL_INTERVAL)
 
     async def run_once(self) -> bool:
-        """Claim and process the oldest queued job. Returns False when the queue is empty."""
         claimed = await claim_next_job()
         if claimed is None:
             return False
@@ -135,7 +132,6 @@ async def claim_next_job() -> tuple[uuid.UUID, str, int | None] | None:
 
 
 async def requeue_interrupted_jobs() -> None:
-    """Jobs left mid-download by a restart go back to the queue."""
     async with SessionLocal() as session, session.begin():
         await session.execute(
             update(DownloadJob)

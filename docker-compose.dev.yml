@@ -1,4 +1,3 @@
-# Postgres only, for running the api and web on the host during development.
 services:
   postgres:
     image: postgres:17-alpine

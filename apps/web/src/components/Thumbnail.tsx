@@ -8,7 +8,6 @@ export function Thumbnail({
 }: {
   video: Video;
   rounded?: string;
-  /** Fraction already watched, drawn as the red bar youtube.com shows under resumed videos. */
   progress?: number;
 }) {
   return (

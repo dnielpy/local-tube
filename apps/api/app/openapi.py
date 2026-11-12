@@ -1,5 +1,3 @@
-"""Print the OpenAPI schema, used to generate the web client types."""
-
 import json
 
 from app.main import app

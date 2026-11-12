@@ -9,14 +9,14 @@ os.environ.setdefault(
 os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="localtube-media-")
 os.environ["WORKER_ENABLED"] = "false"
 
-import pytest  # noqa: E402
-from httpx import ASGITransport, AsyncClient  # noqa: E402
-from sqlalchemy import text  # noqa: E402
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 
-from app.config import get_settings  # noqa: E402
-from app.db import SessionLocal, engine  # noqa: E402
-from app.main import app  # noqa: E402
-from app.models import Base, Video  # noqa: E402
+from app.config import get_settings
+from app.db import SessionLocal, engine
+from app.main import app
+from app.models import Base, Video
 
 
 @pytest.fixture(scope="session", autouse=True)

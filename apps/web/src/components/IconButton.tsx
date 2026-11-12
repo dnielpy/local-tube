@@ -1,6 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-/** The round 40px icon button used across the youtube.com header and menus. */
 export function IconButton({
   label,
   children,

@@ -16,7 +16,6 @@ export function Header({ onMenu }: { onMenu: () => void }) {
   const [synced, setSynced] = useState(current);
   const [mobileSearch, setMobileSearch] = useState(false);
 
-  // Keep the box in step with the URL when navigating, without an effect.
   if (current !== synced) {
     setSynced(current);
     setQuery(current);

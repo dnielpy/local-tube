@@ -8,7 +8,6 @@ dist/
 *.log
 .DS_Store
 
-# python
 __pycache__/
 *.pyc
 .venv/
@@ -16,9 +15,7 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 
-# local media
 media/
 
-# yt-dlp cookies
 config/
 cookies.txt

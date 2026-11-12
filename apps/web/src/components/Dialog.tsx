@@ -2,7 +2,6 @@
 
 import { useEffect, type ReactNode } from "react";
 
-/** youtube.com's confirmation dialog: title, body and text buttons aligned to the right. */
 export function ConfirmDialog({
   open,
   title,
