@@ -13,6 +13,7 @@ from app.services.connectivity import connectivity
 from app.services.image_cache import ImageFetcher, cache_image, http_fetch, remove_cached
 from app.services.profiles import cookies_path
 from app.services.youtube import ChannelPage, RemoteChannel, YouTubeError
+from app.services.youtube_cookies import recheck_soon
 from app.settings_store import read_setting, write_setting
 
 logger = logging.getLogger(__name__)
@@ -109,6 +110,8 @@ class ChannelService:
                 )
             except YouTubeError as exc:
                 logger.warning("could not sync the subscriptions of %s: %s", profile_id, exc)
+                # Usually the cookies stopped working: let the status show it soon.
+                await recheck_soon(profile_id)
                 return False
 
             async with SessionLocal() as session:

@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from http.cookiejar import MozillaCookieJar
+from pathlib import Path
 
 import httpx
 
@@ -72,10 +73,19 @@ def _selected_account(data: dict) -> Account | None:
 async def read_account(cookies_file: str) -> Account | None:
     """Ask YouTube, with these cookies, whether they are signed in and as whom.
 
-    None means YouTube could not be asked, so nothing is known about the session.
+    None means YouTube could not be asked, so nothing is known about the session. Google
+    rotates some session cookies on every answer and may end the session when the old ones keep
+    being used, so the renewed cookies are written back to the file, as yt-dlp does.
     """
     jar = MozillaCookieJar(cookies_file)
     jar.load(ignore_discard=True, ignore_expires=True)
+    try:
+        return await _ask_youtube(jar)
+    finally:
+        jar.save(ignore_discard=True, ignore_expires=True)
+
+
+async def _ask_youtube(jar: MozillaCookieJar) -> Account | None:
     async with httpx.AsyncClient(
         cookies=jar, headers={"User-Agent": USER_AGENT}, timeout=15, follow_redirects=True
     ) as client:
@@ -169,6 +179,9 @@ class YouTubeCookies:
             with os.fdopen(handle, "w") as file:
                 file.write(text)
             account = await self.read(name)
+            # Keep the cookies YouTube renewed while answering, not the pasted ones.
+            if account is not None and account.logged_in:
+                text = normalize(await asyncio.to_thread(Path(name).read_text))
         except Exception:
             logger.exception("could not check the YouTube session")
             account = None
@@ -212,3 +225,11 @@ async def mark_expired(profile_id: uuid.UUID) -> None:
         if profile is not None:
             profile.cookies_valid = False
             profile.cookies_checked_at = datetime.now(UTC)
+
+
+async def recheck_soon(profile_id: uuid.UUID) -> None:
+    """Forget the last check, so the next status request asks YouTube again."""
+    async with SessionLocal() as session, session.begin():
+        profile = await session.get(Profile, profile_id)
+        if profile is not None:
+            profile.cookies_checked_at = None
