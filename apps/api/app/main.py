@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import get_settings
-from app.routers import downloads, health, videos
+from app.routers import downloads, health, status, videos
+from app.services.connectivity import connectivity, youtube_probe
 from app.services.downloader import YtDlpDownloader
 from app.services.worker import DownloadWorker
 
@@ -13,6 +14,12 @@ from app.services.worker import DownloadWorker
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.media_root.mkdir(parents=True, exist_ok=True)
+    if settings.connectivity_check:
+        await connectivity.start(
+            youtube_probe(settings.connectivity_url), settings.connectivity_interval
+        )
+    else:
+        await connectivity.load()
     worker = None
     if settings.worker_enabled:
         downloader = YtDlpDownloader(
@@ -24,9 +31,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     if worker is not None:
         await worker.stop()
+    await connectivity.stop()
 
 
 app = FastAPI(title="LocalTube API", lifespan=lifespan)
 app.include_router(health.router, prefix="/api")
 app.include_router(videos.router, prefix="/api")
 app.include_router(downloads.router, prefix="/api")
+app.include_router(status.router, prefix="/api")

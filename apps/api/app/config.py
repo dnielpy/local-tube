@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     cookies_file: str | None = None
     cookies_from_browser: str | None = None
     default_max_height: int = 360
+    connectivity_check: bool = True
+    connectivity_url: str = "https://www.youtube.com/generate_204"
+    connectivity_interval: float = 60
 
 
 @lru_cache

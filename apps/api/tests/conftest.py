@@ -8,6 +8,7 @@ os.environ.setdefault(
 )
 os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="localtube-media-")
 os.environ["WORKER_ENABLED"] = "false"
+os.environ["CONNECTIVITY_CHECK"] = "false"
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -17,6 +18,7 @@ from app.config import get_settings
 from app.db import SessionLocal, engine
 from app.main import app
 from app.models import Base, Video
+from app.services.connectivity import connectivity
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -30,9 +32,11 @@ async def schema() -> AsyncIterator[None]:
 
 @pytest.fixture(autouse=True)
 async def clean_tables() -> AsyncIterator[None]:
+    connectivity.reachable = True
+    connectivity.forced_offline = False
     yield
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE download_jobs, videos CASCADE"))
+        await conn.execute(text("TRUNCATE download_jobs, videos, app_settings CASCADE"))
 
 
 @pytest.fixture

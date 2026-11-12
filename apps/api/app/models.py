@@ -26,6 +26,13 @@ class Video(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+
+
 class JobStatus(enum.StrEnum):
     queued = "queued"
     downloading = "downloading"
