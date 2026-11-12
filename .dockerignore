@@ -1,0 +1,7 @@
+**/node_modules
+**/.next
+**/.turbo
+**/.venv
+**/__pycache__
+media
+.git

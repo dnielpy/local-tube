@@ -1,0 +1,13 @@
+# Single entry point on the LAN: the api serves /api (including video streams with Range
+# support), everything else is the Next.js app.
+:80 {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
