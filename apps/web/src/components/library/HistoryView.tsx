@@ -153,7 +153,7 @@ export function HistoryView() {
           type="button"
           disabled={(history.data?.total ?? 0) === 0 && !query}
           onClick={() => setConfirming(true)}
-          className="mt-4 flex h-9 items-center gap-3 rounded-full px-3 text-sm font-medium hover:bg-yt-surface disabled:opacity-50"
+          className="mt-4 flex min-h-9 items-center gap-3 rounded-full px-3 py-2 text-left text-sm font-medium hover:bg-yt-surface disabled:opacity-50"
         >
           <TrashIcon />
           Borrar todo el historial de reproducciones

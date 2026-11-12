@@ -56,7 +56,7 @@ export function VideoRow({
           </Link>
         )}
         {large && video.description && (
-          <p className="mt-2 line-clamp-2 hidden text-xs text-yt-text-secondary mini:block">
+          <p className="mt-2 line-clamp-2 text-xs break-words text-yt-text-secondary max-mini:hidden">
             {video.description}
           </p>
         )}
