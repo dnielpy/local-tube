@@ -54,7 +54,7 @@ export function SettingsMenu({
             <BackIcon />
             <span>Velocidad de reproducción</span>
           </button>
-          <div className="max-h-[300px] overflow-y-auto pt-2">
+          <div className="max-h-[min(336px,calc(56.25vw-120px))] overflow-y-auto pt-2">
             {speeds.map((speed) => (
               <button
                 key={speed}

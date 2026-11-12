@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 
-import { HomeFeed } from "@/components/HomeFeed";
+import { HomeFeed, HomeFeedSkeleton } from "@/components/HomeFeed";
 
 export default function HomePage() {
   return (
-    <Suspense>
+    <Suspense fallback={<HomeFeedSkeleton />}>
       <HomeFeed />
     </Suspense>
   );

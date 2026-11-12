@@ -341,8 +341,9 @@ export function Player({
         fullscreen
           ? "h-full w-full"
           : theater
-            ? "h-full w-full"
-            : "aspect-video w-full rounded-none search:rounded-xl"
+            ? // Theater layout only exists from 1017px; below that it is the normal player.
+              "aspect-video w-full search:rounded-xl watch:aspect-auto watch:h-full watch:rounded-none"
+            : "aspect-video w-full search:rounded-xl"
       } ${showAll ? "" : "cursor-none"}`}
       onMouseMove={showControls}
       onMouseLeave={() => playing && !settingsOpen && setControlsVisible(false)}

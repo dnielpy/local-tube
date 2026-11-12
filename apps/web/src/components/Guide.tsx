@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, type ComponentType, type SVGProps } from "react";
+import { Suspense, use, useEffect, type ComponentType, type SVGProps } from "react";
+import { browser } from "react-dom";
 
 import { api, queryKeys } from "@/lib/api";
 
@@ -30,9 +31,29 @@ function useActive() {
   return (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 }
 
+function GuideChannels() {
+  use(browser("Channels are fetched from the api in the browser."));
+  const channels = useQuery({ queryKey: queryKeys.channels, queryFn: api.channels });
+  if (!channels.data || channels.data.length === 0) return null;
+  return (
+    <section className="border-b border-yt-divider px-3 py-3">
+      <h3 className="px-3 pt-[6px] pb-1 text-base font-medium">Canales</h3>
+      {channels.data.map((channel) => (
+        <Link
+          key={channel}
+          href={`/?channel=${encodeURIComponent(channel)}`}
+          className="flex h-10 items-center gap-6 rounded-[10px] px-3 hover:bg-yt-surface"
+        >
+          <ChannelAvatar name={channel} size={24} />
+          <span className="truncate text-sm">{channel}</span>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
 function GuideContents() {
   const isActive = useActive();
-  const channels = useQuery({ queryKey: queryKeys.channels, queryFn: api.channels });
 
   return (
     <nav className="flex flex-col">
@@ -55,21 +76,9 @@ function GuideContents() {
           );
         })}
       </section>
-      {channels.data && channels.data.length > 0 && (
-        <section className="border-b border-yt-divider px-3 py-3">
-          <h3 className="px-3 pt-[6px] pb-1 text-base font-medium">Canales</h3>
-          {channels.data.map((channel) => (
-            <Link
-              key={channel}
-              href={`/?channel=${encodeURIComponent(channel)}`}
-              className="flex h-10 items-center gap-6 rounded-[10px] px-3 hover:bg-yt-surface"
-            >
-              <ChannelAvatar name={channel} size={24} />
-              <span className="truncate text-sm">{channel}</span>
-            </Link>
-          ))}
-        </section>
-      )}
+      <Suspense>
+        <GuideChannels />
+      </Suspense>
       <footer className="px-6 py-4 text-xs text-yt-text-secondary">
         <p className="font-medium">LocalTube</p>
         <p className="mt-3 text-[#717171]">Tu biblioteca de videos en la red local</p>

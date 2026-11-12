@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { use, useEffect, useRef, useState, type FormEvent } from "react";
+import { browser } from "react-dom";
 
 import { api, ApiError, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
@@ -14,6 +15,7 @@ const ACTIVE: JobStatus[] = ["queued", "downloading", "processing"];
 const isActive = (job: DownloadJob) => ACTIVE.includes(job.status);
 
 export function Downloads() {
+  use(browser("Library data is fetched from the api in the browser."));
   const client = useQueryClient();
   const jobs = useQuery({
     queryKey: queryKeys.downloads,

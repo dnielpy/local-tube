@@ -144,3 +144,62 @@ body {
   background: var(--yt-skeleton);
   animation: yt-pulse 1.5s ease-in-out infinite;
 }
+
+/*
+ * Watch page. The player keeps a single position in the tree so switching to theater mode
+ * only moves it with grid areas instead of remounting (which would restart the video).
+ */
+.watch-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "player" "info" "secondary";
+}
+
+.watch-layout > [data-area="player"] {
+  grid-area: player;
+}
+.watch-layout > [data-area="info"] {
+  grid-area: info;
+}
+.watch-layout > [data-area="secondary"] {
+  grid-area: secondary;
+}
+
+@media (min-width: 657px) {
+  .watch-layout {
+    padding: 24px 24px 0;
+  }
+}
+
+@media (min-width: 1017px) {
+  .watch-layout {
+    grid-template-columns: minmax(0, 1fr) 402px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "player secondary" "info secondary";
+    column-gap: 24px;
+    max-width: 1754px;
+    margin: 0 auto;
+  }
+
+  .watch-layout[data-theater="true"] {
+    grid-template-columns: minmax(24px, 1fr) minmax(0, 1280px) 402px minmax(24px, 1fr);
+    grid-template-areas: "player player player player" ". info secondary .";
+    column-gap: 0;
+    max-width: none;
+    padding: 0;
+  }
+
+  .watch-layout[data-theater="true"] > [data-area="player"] {
+    height: max(480px, min(calc(100vh - 169px), 56.25vw));
+    max-height: calc(100vh - 56px);
+    background: #000;
+  }
+
+  .watch-layout[data-theater="true"] > [data-area="info"] {
+    padding: 12px 24px 0 0;
+  }
+
+  .watch-layout[data-theater="true"] > [data-area="secondary"] {
+    padding-top: 24px;
+  }
+}

@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { use } from "react";
+import { browser } from "react-dom";
 
 import { api, queryKeys, type Video } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
@@ -15,6 +17,7 @@ import { VideoMenu } from "./VideoMenu";
 
 /** youtube.com's /results page: one row per video, thumbnail on the left. */
 export function SearchResults() {
+  use(browser("Library data is fetched from the api in the browser."));
   const query = useSearchParams().get("search_query") ?? "";
   const results = useQuery({
     queryKey: queryKeys.videos({ q: query }),

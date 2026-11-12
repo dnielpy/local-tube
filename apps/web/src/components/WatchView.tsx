@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
+import { browser } from "react-dom";
 
 import { api, queryKeys, type Video } from "@/lib/api";
 import { useDeleteVideo } from "@/lib/use-delete-video";
@@ -18,6 +19,7 @@ import { WatchNext, WatchNextSkeleton } from "./WatchNext";
 const THEATER_KEY = "localtube:theater";
 
 export function WatchView() {
+  use(browser("Library data is fetched from the api in the browser."));
   const id = useSearchParams().get("v") ?? "";
   const router = useRouter();
   const video = useQuery({
@@ -29,15 +31,13 @@ export function WatchView() {
     queryKey: queryKeys.videos({ limit: 200 }),
     queryFn: () => api.videos({ limit: 200 }),
   });
-  const [theater, setTheater] = useState(false);
-
-  useEffect(() => {
+  const [theater, setTheater] = useState(() => {
     try {
-      // Restoring a saved preference from storage after hydration.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTheater(localStorage.getItem(THEATER_KEY) === "1");
-    } catch {}
-  }, []);
+      return localStorage.getItem(THEATER_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (video.data) document.title = `${video.data.title} - LocalTube`;
@@ -85,21 +85,14 @@ export function WatchView() {
   const secondary = library.isPending ? <WatchNextSkeleton /> : <WatchNext videos={others} />;
 
   return (
-    <div className="mx-auto w-full">
-      {theater && (
-        <div className="hidden h-[min(calc(100vh-169px),56.25vw)] max-h-[calc(100vh-56px)] min-h-[480px] w-full bg-black watch:block">
-          {player}
-        </div>
-      )}
-      <div className="mx-auto flex max-w-[1754px] flex-col gap-6 search:px-6 search:pt-6 watch:flex-row">
-        <div className="min-w-0 flex-1">
-          <div className={theater ? "watch:hidden" : ""}>{player}</div>
-          <div className="px-3 search:px-0">
-            {video.data ? <VideoInfo video={video.data} /> : <InfoSkeleton />}
-          </div>
-        </div>
-        <aside className="w-full shrink-0 px-3 pb-6 search:px-0 watch:w-[402px]">{secondary}</aside>
+    <div className="watch-layout" data-theater={theater}>
+      <div data-area="player">{player}</div>
+      <div data-area="info" className="min-w-0 px-3 search:px-0">
+        {video.data ? <VideoInfo video={video.data} /> : <InfoSkeleton />}
       </div>
+      <aside data-area="secondary" className="px-3 pb-6 search:px-0">
+        {secondary}
+      </aside>
     </div>
   );
 }

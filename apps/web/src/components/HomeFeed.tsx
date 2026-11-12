@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { use } from "react";
+import { browser } from "react-dom";
 
 import { api, queryKeys } from "@/lib/api";
 
@@ -13,6 +15,7 @@ const GRID =
   "grid grid-cols-1 gap-x-4 gap-y-10 xs:grid-cols-2 grid3:grid-cols-3 grid4:grid-cols-4 grid5:grid-cols-5";
 
 export function HomeFeed() {
+  use(browser("Library data is fetched from the api in the browser."));
   const channel = useSearchParams().get("channel") ?? undefined;
   const channels = useQuery({ queryKey: queryKeys.channels, queryFn: api.channels });
   const videos = useQuery({
@@ -25,11 +28,7 @@ export function HomeFeed() {
       <ChipBar channels={channels.data ?? []} active={channel} />
       <div className="px-4 pt-6 pb-10 search:px-6">
         {videos.isPending ? (
-          <div className={GRID}>
-            {Array.from({ length: 12 }, (_, index) => (
-              <VideoCardSkeleton key={index} />
-            ))}
-          </div>
+          <GridSkeleton />
         ) : videos.isError ? (
           <p className="py-20 text-center text-yt-text-secondary">
             No se pudo cargar la biblioteca. Comprueba que la API está en marcha.
@@ -43,6 +42,27 @@ export function HomeFeed() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function GridSkeleton() {
+  return (
+    <div className={GRID}>
+      {Array.from({ length: 12 }, (_, index) => (
+        <VideoCardSkeleton key={index} />
+      ))}
+    </div>
+  );
+}
+
+export function HomeFeedSkeleton() {
+  return (
+    <div>
+      <div className="h-14" />
+      <div className="px-4 pt-6 pb-10 search:px-6">
+        <GridSkeleton />
       </div>
     </div>
   );
