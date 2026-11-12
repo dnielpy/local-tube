@@ -5,7 +5,7 @@ from app.db import SessionLocal
 from app.models import Video
 from app.services.connectivity import connectivity
 from app.services.profiles import SESSION_COOKIE, cookies_path
-from app.services.youtube_cookies import normalize
+from app.services.youtube_cookies import Account, normalize
 from tests.conftest import COOKIES
 
 
@@ -43,7 +43,7 @@ async def test_create_profile_saves_cookies_photo_and_signs_in(
     assert (await anon_client.get(body["avatar_url"])).status_code == 200
     cookies = cookies_path(uuid.UUID(body["id"]))
     assert cookies and Path(cookies).read_text() == normalize(COOKIES)  # noqa: ASYNC240
-    assert account.files == [cookies]
+    assert len(account.files) == 1
     assert youtube.cookies == [cookies]
     assert (await anon_client.get("/api/session")).json()["id"] == body["id"]
     assert (await anon_client.get("/api/videos")).status_code == 200
@@ -56,6 +56,35 @@ async def test_profile_without_a_youtube_photo_keeps_the_default(anon_client, ac
 
     assert body["avatar_url"] is None
     assert body["youtube_name"] is None
+
+
+async def test_cookies_youtube_does_not_accept_are_rejected(anon_client, account):
+    account.account = Account(logged_in=False)
+
+    response = await create(anon_client)
+
+    assert response.status_code == 422
+    assert "no reconoce" in response.json()["detail"]["message"]
+    assert (await anon_client.get("/api/profiles")).json() == []
+
+
+async def test_cookies_are_kept_when_youtube_cannot_be_asked(anon_client, account):
+    account.account = None
+
+    response = await create(anon_client)
+
+    assert response.status_code == 201
+    assert cookies_path(uuid.UUID(response.json()["id"]))
+
+
+async def test_replacing_with_cookies_youtube_rejects_keeps_the_old_ones(client, profile, account):
+    await client.put(f"/api/profiles/{profile.id}/cookies", json={"cookies": COOKIES})
+    account.account = Account(logged_in=False)
+
+    response = await client.put(f"/api/profiles/{profile.id}/cookies", json={"cookies": COOKIES})
+
+    assert response.status_code == 422
+    assert cookies_path(profile.id)
 
 
 async def test_profile_can_be_created_offline(anon_client, account):
@@ -121,7 +150,7 @@ async def test_profile_can_replace_its_cookies(client, profile, account, youtube
 
     assert response.status_code == 200
     assert response.json()["youtube_name"] == "Daniel Quesada"
-    assert account.files == [cookies_path(profile.id)]
+    assert len(account.files) == 1
     assert youtube.cookies == [cookies_path(profile.id)]
 
 

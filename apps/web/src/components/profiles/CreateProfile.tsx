@@ -3,7 +3,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
-import { api, ApiError, queryKeys, type Profile } from "@/lib/api";
+import { api, ApiError, type Profile } from "@/lib/api";
+import { openProfile } from "@/lib/profile-session";
 
 import { BackIcon, Logo } from "../icons";
 import { CookiesField } from "./CookiesField";
@@ -175,10 +176,7 @@ function Welcome({ profile }: { profile: Profile }) {
       </p>
       <button
         type="button"
-        onClick={() => {
-          client.clear();
-          client.setQueryData(queryKeys.session, profile);
-        }}
+        onClick={() => openProfile(client, profile)}
         className="mt-8 h-10 rounded-full bg-yt-cta-bg px-8 text-sm font-medium text-yt-cta-text hover:bg-yt-cta-hover"
       >
         Empezar

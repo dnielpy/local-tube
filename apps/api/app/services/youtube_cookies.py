@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -32,11 +33,17 @@ TOPBAR_AVATAR = re.compile(
 
 @dataclass
 class Account:
-    name: str | None
-    avatar_url: str | None
+    logged_in: bool
+    name: str | None = None
+    avatar_url: str | None = None
 
 
 AccountReader = Callable[[str], Awaitable[Account | None]]
+
+INVALID_SESSION = (
+    "YouTube no reconoce estas cookies: la sesión caducó o Google las cambió. Expórtalas de "
+    "nuevo desde una ventana privada y ciérrala sin cerrar sesión."
+)
 
 
 def _selected_account(data: dict) -> Account | None:
@@ -50,6 +57,7 @@ def _selected_account(data: dict) -> Account | None:
                 if item and item.get("isSelected"):
                     photos = item.get("accountPhoto", {}).get("thumbnails") or [{}]
                     return Account(
+                        logged_in=True,
                         name=item.get("accountName", {}).get("simpleText"),
                         avatar_url=photos[-1].get("url"),
                     )
@@ -57,12 +65,23 @@ def _selected_account(data: dict) -> Account | None:
 
 
 async def read_account(cookies_file: str) -> Account | None:
-    """Ask YouTube, with the profile's cookies, which account is signed in."""
+    """Ask YouTube, with these cookies, whether they are signed in and as whom.
+
+    None means YouTube could not be asked, so nothing is known about the session.
+    """
     jar = MozillaCookieJar(cookies_file)
     jar.load(ignore_discard=True, ignore_expires=True)
     async with httpx.AsyncClient(
         cookies=jar, headers={"User-Agent": USER_AGENT}, timeout=15, follow_redirects=True
     ) as client:
+        try:
+            home = await client.get("https://www.youtube.com/")
+            home.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.info("could not open youtube.com: %s", exc)
+            return None
+        if '"LOGGED_IN":true' not in home.text:
+            return Account(logged_in=False)
         try:
             response = await client.get("https://www.youtube.com/getAccountSwitcherEndpoint")
             response.raise_for_status()
@@ -71,13 +90,8 @@ async def read_account(cookies_file: str) -> Account | None:
                 return account
         except (httpx.HTTPError, ValueError, LookupError, TypeError) as exc:
             logger.info("the account switcher did not answer: %s", exc)
-        try:
-            response = await client.get("https://www.youtube.com/")
-            match = TOPBAR_AVATAR.search(response.text)
-            return Account(name=None, avatar_url=match.group(1)) if match else None
-        except httpx.HTTPError as exc:
-            logger.info("could not open youtube.com: %s", exc)
-            return None
+        match = TOPBAR_AVATAR.search(home.text)
+        return Account(logged_in=True, avatar_url=match.group(1) if match else None)
 
 
 def normalize(text: str) -> str:
@@ -115,10 +129,26 @@ class YouTubeCookies:
         self.read = read
         self.fetch = fetch
 
-    def validate(self, text: str) -> str:
-        return normalize(text)
+    async def check(self, text: str) -> tuple[str, Account | None]:
+        """Clean up pasted cookies and, when online, make sure YouTube accepts them."""
+        text = normalize(text)
+        if not connectivity.online:
+            return text, None
+        handle, name = tempfile.mkstemp(suffix=".txt")
+        try:
+            with os.fdopen(handle, "w") as file:
+                file.write(text)
+            account = await self.read(name)
+        except Exception:
+            logger.exception("could not check the YouTube session")
+            account = None
+        finally:
+            os.unlink(name)
+        if account is not None and not account.logged_in:
+            raise ValueError(INVALID_SESSION)
+        return text, account
 
-    async def apply(self, profile: Profile, text: str) -> None:
+    async def apply(self, profile: Profile, text: str, account: Account | None) -> None:
         directory = profile_dir(profile.id)
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "cookies.txt"
@@ -127,14 +157,6 @@ class YouTubeCookies:
         os.chmod(temporary, 0o600)
         temporary.replace(path)
         profile.signed_in_at = datetime.now(UTC)
-
-        if not connectivity.online:
-            return
-        try:
-            account = await self.read(str(path))
-        except Exception:
-            logger.exception("could not read the YouTube account of %s", profile.id)
-            account = None
         if account is None:
             return
         profile.youtube_name = account.name or profile.youtube_name

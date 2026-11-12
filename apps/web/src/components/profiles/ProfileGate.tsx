@@ -1,8 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { use, type ReactNode } from "react";
-import { browser } from "react-dom";
+import type { ReactNode } from "react";
 
 import { api, ApiError, queryKeys } from "@/lib/api";
 import { setProgressProfile } from "@/lib/watch-progress";
@@ -11,7 +10,8 @@ import { ProfilePicker } from "./ProfilePicker";
 
 /** Shows the profile picker until a profile is unlocked, and the app after. */
 export function ProfileGate({ children }: { children: ReactNode }) {
-  use(browser("The profile session lives in a cookie only the api can read."));
+  // On the server the session is unknown, so it renders the empty background until the browser
+  // asks the api.
   const session = useQuery({
     queryKey: queryKeys.session,
     queryFn: api.session,

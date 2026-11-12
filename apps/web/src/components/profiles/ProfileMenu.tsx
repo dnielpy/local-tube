@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { api, queryKeys, type Profile } from "@/lib/api";
+import { closeProfile } from "@/lib/profile-session";
 
 import { RetryIcon } from "../icons";
 import { cookiesError } from "./CreateProfile";
@@ -31,8 +32,7 @@ export function ProfileMenu() {
 
   async function switchProfile() {
     setOpen(false);
-    await api.logout().catch(() => undefined);
-    client.clear();
+    await closeProfile(client);
   }
 
   return (

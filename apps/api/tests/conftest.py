@@ -226,7 +226,9 @@ COOKIES = (
 class FakeAccount:
     def __init__(self) -> None:
         self.account: Account | None = Account(
-            name="Daniel Quesada", avatar_url="https://yt3.ggpht.com/photo=s88-c-k"
+            logged_in=True,
+            name="Daniel Quesada",
+            avatar_url="https://yt3.ggpht.com/photo=s88-c-k",
         )
         self.files: list[str] = []
 

@@ -23,7 +23,7 @@ from app.services.profiles import (
     start_session,
     verify_pin,
 )
-from app.services.youtube_cookies import YouTubeCookies
+from app.services.youtube_cookies import Account, YouTubeCookies
 
 router = APIRouter(tags=["profiles"])
 
@@ -62,9 +62,9 @@ def _check_pin(profile: Profile, pin: str) -> None:
     pin_guard.succeeded(profile.id)
 
 
-def _valid_cookies(cookies: YouTubeCookies, text: str) -> str:
+async def _checked_cookies(cookies: YouTubeCookies, text: str) -> tuple[str, Account | None]:
     try:
-        return cookies.validate(text)
+        return await cookies.check(text)
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, {"message": str(exc)}) from exc
 
@@ -82,14 +82,14 @@ async def create_profile(
     channels: ServiceDep,
     response: Response,
 ) -> Profile:
-    text = _valid_cookies(cookies, body.cookies)
+    text, account = await _checked_cookies(cookies, body.cookies)
     first = not await session.scalar(select(func.count()).select_from(Profile))
     profile = Profile(name=body.name, pin_hash=hash_pin(body.pin))
     session.add(profile)
     await session.flush()
     if first:
         await claim_orphans(session, profile.id)
-    await cookies.apply(profile, text)
+    await cookies.apply(profile, text, account)
     await session.commit()
     await start_session(response, profile.id)
     await channels.schedule_subscriptions(profile.id, force=True)
@@ -107,9 +107,9 @@ async def update_cookies(
 ) -> Profile:
     if current.id != profile_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not your profile")
-    text = _valid_cookies(cookies, body.cookies)
+    text, account = await _checked_cookies(cookies, body.cookies)
     profile = await _get_profile(session, profile_id)
-    await cookies.apply(profile, text)
+    await cookies.apply(profile, text, account)
     await session.commit()
     await channels.schedule_subscriptions(profile.id, force=True)
     return profile

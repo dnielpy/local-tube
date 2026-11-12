@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, ApiError, queryKeys, type Profile } from "@/lib/api";
+import { openProfile } from "@/lib/profile-session";
 
 import { BackIcon, Logo, TrashIcon } from "../icons";
 import { CreateProfile } from "./CreateProfile";
@@ -156,8 +157,7 @@ function PinScreen({
         : api.deleteProfile(profile.id, pin).then(() => null),
     onSuccess: (unlocked) => {
       if (unlocked) {
-        client.clear();
-        client.setQueryData(queryKeys.session, unlocked);
+        openProfile(client, unlocked);
       } else {
         client.invalidateQueries({ queryKey: queryKeys.profiles });
         onBack();
