@@ -2,6 +2,7 @@ import pytest
 
 from app.db import SessionLocal
 from app.models import DownloadJob, JobStatus
+from app.services.connectivity import connectivity
 from app.services.downloader import (
     DownloadError,
     DownloadResult,
@@ -188,3 +189,17 @@ def test_format_selector_caps_height():
 def testclean_error_strips_colors():
     error = Exception("\x1b[0;31mERROR:\x1b[0m [youtube] abc: Sign in to confirm")
     assert clean_error(error) == "[youtube] abc: Sign in to confirm"
+
+
+async def test_worker_waits_while_offline(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    downloader = FakeDownloader(media_root)
+    worker = DownloadWorker(downloader)
+    connectivity.forced_offline = True
+
+    assert await worker.run_once() is False
+    assert (await client.get(f"/api/downloads/{job['id']}")).json()["status"] == "queued"
+
+    connectivity.forced_offline = False
+    assert await worker.run_once() is True
+    assert (await client.get(f"/api/downloads/{job['id']}")).json()["status"] == "completed"

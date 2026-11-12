@@ -9,6 +9,7 @@ from sqlalchemy import select, update
 
 from app.db import SessionLocal
 from app.models import DownloadJob, JobStatus, Video
+from app.services.connectivity import connectivity
 from app.services.downloader import DownloadError, DownloadResult, Probe, Progress
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,8 @@ class DownloadWorker:
                     await asyncio.wait_for(self._wakeup.wait(), IDLE_POLL_INTERVAL)
 
     async def run_once(self) -> bool:
+        if not connectivity.online:
+            return False
         claimed = await claim_next_job()
         if claimed is None:
             return False
