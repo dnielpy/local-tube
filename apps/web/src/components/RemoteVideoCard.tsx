@@ -1,25 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
 import { api, queryKeys, type DownloadJob, type RemoteVideo } from "@/lib/api";
 import { formatCount, formatDuration, timeAgo } from "@/lib/format";
+import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
 import { CheckIcon, DownloadIcon, ExternalIcon, RetryIcon } from "./icons";
 import { QualityDialog } from "./QualityDialog";
-
-const ACTIVE = new Set(["queued", "downloading", "processing"]);
-
-export function useDownloadJobs() {
-  return useQuery({
-    queryKey: queryKeys.downloads,
-    queryFn: api.downloads,
-    refetchInterval: (query) =>
-      query.state.data?.some((job) => ACTIVE.has(job.status)) ? 1500 : false,
-  });
-}
 
 function jobLabel(job: DownloadJob): string {
   if (job.status === "queued") return "En cola";
@@ -32,7 +22,7 @@ export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; chan
   const jobs = useDownloadJobs();
   const job = jobs.data?.find((item) => item.youtube_id === video.youtube_id);
   const localId = video.video_id ?? (job?.status === "completed" ? job.video_id : null);
-  const active = job && ACTIVE.has(job.status);
+  const active = job && isActiveJob(job);
 
   const [choosing, setChoosing] = useState(false);
   const retry = useMutation({

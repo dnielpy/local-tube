@@ -8,11 +8,12 @@ import { browser } from "react-dom";
 
 import { api, ApiError, queryKeys, type ChannelDetail } from "@/lib/api";
 import { formatCount, timeAgo } from "@/lib/format";
+import { useDownloadJobs } from "@/lib/use-downloads";
 
 import { ChannelPhoto } from "./ChannelPhoto";
 import { GRID, GridSkeleton } from "./HomeFeed";
 import { CheckIcon, ExternalIcon, RetryIcon } from "./icons";
-import { RemoteVideoCard, useDownloadJobs } from "./RemoteVideoCard";
+import { RemoteVideoCard } from "./RemoteVideoCard";
 import { VideoCard } from "./VideoCard";
 
 type Tab = "videos" | "downloaded";

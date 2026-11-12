@@ -197,3 +197,50 @@ body {
     padding-top: 24px;
   }
 }
+
+@theme {
+  --animate-lt-drop: lt-drop 0.45s ease-out;
+  --animate-lt-bounce: lt-bounce 0.6s ease-out 0.35s;
+  --animate-lt-ping: lt-ping 0.8s ease-out forwards;
+
+  @keyframes lt-drop {
+    0% {
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+    35% {
+      opacity: 1;
+    }
+    70% {
+      transform: translateY(2px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes lt-bounce {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    45% {
+      transform: scale(0.88);
+    }
+    70% {
+      transform: scale(1.12);
+    }
+  }
+
+  @keyframes lt-ping {
+    0% {
+      opacity: 0.7;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.8);
+    }
+  }
+}

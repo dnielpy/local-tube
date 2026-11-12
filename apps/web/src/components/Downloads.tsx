@@ -1,28 +1,22 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
+import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
 import { IconButton } from "./IconButton";
 import { QualityDialog } from "./QualityDialog";
 import { AlertIcon, CheckIcon, CloseIcon, DownloadIcon, RetryIcon, TrashIcon } from "./icons";
 
-const ACTIVE: JobStatus[] = ["queued", "downloading", "processing"];
-const isActive = (job: DownloadJob) => ACTIVE.includes(job.status);
-
 export function Downloads() {
   use(browser("Library data is fetched from the api in the browser."));
   const client = useQueryClient();
-  const jobs = useQuery({
-    queryKey: queryKeys.downloads,
-    queryFn: api.downloads,
-    refetchInterval: (query) => (query.state.data?.some(isActive) ? 1500 : false),
-  });
+  const jobs = useDownloadJobs();
 
   const finished = jobs.data?.filter((job) => job.status === "completed").length ?? 0;
   const seen = useRef(finished);
@@ -154,7 +148,7 @@ function JobRow({ job }: { job: DownloadJob }) {
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.downloads });
   const retry = useMutation({ mutationFn: api.retryDownload, onSuccess: refresh });
   const remove = useMutation({ mutationFn: api.deleteDownload, onSuccess: refresh });
-  const active = isActive(job);
+  const active = isActiveJob(job);
   const watchHref = job.video_id ? `/watch?v=${job.video_id}` : null;
 
   const thumbnail = (

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 
 import { IconButton } from "./IconButton";
-import { BackIcon, CloseIcon, Logo, MenuIcon, PlusIcon, SearchIcon } from "./icons";
+import { DownloadsButton, DownloadsButtonFallback } from "./DownloadsButton";
+import { BackIcon, CloseIcon, Logo, MenuIcon, SearchIcon } from "./icons";
 
 export function Header({ onMenu }: { onMenu: () => void }) {
   const router = useRouter();
@@ -94,13 +95,9 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <IconButton label="Buscar" className="search:hidden" onClick={() => setMobileSearch(true)}>
           <SearchIcon />
         </IconButton>
-        <Link
-          href="/downloads"
-          className="flex h-9 items-center gap-[6px] rounded-full bg-yt-surface pr-4 pl-[10px] text-sm font-medium hover:bg-yt-surface-hover"
-        >
-          <PlusIcon />
-          <span>Crear</span>
-        </Link>
+        <Suspense fallback={<DownloadsButtonFallback />}>
+          <DownloadsButton />
+        </Suspense>
       </div>
     </header>
   );
