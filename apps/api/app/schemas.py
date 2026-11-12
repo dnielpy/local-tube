@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from app.models import JobStatus
+from app.models import JobStatus, PlaylistKind
 
 
 class VideoOut(BaseModel):
@@ -183,3 +183,57 @@ class CookieStatusOut(BaseModel):
 
 class PinIn(BaseModel):
     pin: str = Field(pattern=PIN_PATTERN)
+
+
+class WatchIn(BaseModel):
+    position: float = Field(ge=0)
+    duration: float | None = Field(default=None, ge=0)
+
+
+class HistoryEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    video: VideoOut
+    watched_at: datetime
+    position: float
+    duration: float | None
+
+
+class HistoryPage(BaseModel):
+    items: list[HistoryEntryOut]
+    total: int
+
+
+class PlaylistIn(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("name cannot be blank")
+        return value
+
+
+class PlaylistOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    kind: PlaylistKind
+    count: int
+    thumbnail_url: str | None
+    updated_at: datetime
+    # Only when the list was asked about one video: whether that video is in it.
+    contains: bool | None = None
+
+
+class PlaylistItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    video: VideoOut
+    added_at: datetime
+
+
+class PlaylistDetail(PlaylistOut):
+    items: list[PlaylistItemOut]
+    duration_seconds: int

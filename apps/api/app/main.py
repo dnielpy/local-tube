@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import get_settings
-from app.routers import channels, downloads, health, profiles, status, videos
+from app.routers import channels, downloads, health, library, profiles, status, videos
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity, youtube_probe
 from app.services.downloader import YtDlpDownloader
@@ -63,3 +63,4 @@ app.include_router(downloads.router, prefix="/api")
 app.include_router(status.router, prefix="/api")
 app.include_router(channels.router, prefix="/api")
 app.include_router(profiles.router, prefix="/api")
+app.include_router(library.router, prefix="/api")

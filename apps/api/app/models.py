@@ -126,6 +126,62 @@ class ProfileSubscription(Base):
     rank: Mapped[int] = mapped_column(Integer)
 
 
+class WatchEntry(Base):
+    """A video in a profile's history, with where it was left."""
+
+    __tablename__ = "watch_history"
+
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True
+    )
+    video_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True
+    )
+    watched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    position: Mapped[float] = mapped_column(Float, default=0)
+    duration: Mapped[float | None] = mapped_column(Float)
+
+    video: Mapped[Video] = relationship(lazy="selectin")
+
+
+class PlaylistKind(enum.StrEnum):
+    watch_later = "watch_later"
+    liked = "liked"
+    custom = "custom"
+
+
+class Playlist(Base):
+    __tablename__ = "playlists"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(Text)
+    kind: Mapped[PlaylistKind] = mapped_column(
+        Enum(PlaylistKind, name="playlist_kind"), default=PlaylistKind.custom
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class PlaylistItem(Base):
+    __tablename__ = "playlist_items"
+
+    playlist_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("playlists.id", ondelete="CASCADE"), primary_key=True
+    )
+    video_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    video: Mapped[Video] = relationship(lazy="selectin")
+
+
 class AppSetting(Base):
     __tablename__ = "app_settings"
 

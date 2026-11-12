@@ -1,11 +1,11 @@
 import uuid
 
-from sqlalchemy import exists, select, update
+from sqlalchemy import delete, exists, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.media import remove_video_dir
-from app.models import DownloadJob, ProfileVideo, Video
+from app.models import DownloadJob, Playlist, PlaylistItem, ProfileVideo, Video, WatchEntry
 
 
 def in_library(profile_id: uuid.UUID):
@@ -34,7 +34,21 @@ async def unlink_video(session: AsyncSession, profile_id: uuid.UUID, video: Vide
     link = await session.get(ProfileVideo, (profile_id, video.id))
     if link is not None:
         await session.delete(link)
-        await session.flush()
+    # Out of the library also means out of this profile's history and playlists.
+    await session.execute(
+        delete(WatchEntry).where(
+            WatchEntry.profile_id == profile_id, WatchEntry.video_id == video.id
+        )
+    )
+    await session.execute(
+        delete(PlaylistItem).where(
+            PlaylistItem.video_id == video.id,
+            PlaylistItem.playlist_id.in_(
+                select(Playlist.id).where(Playlist.profile_id == profile_id)
+            ),
+        )
+    )
+    await session.flush()
     kept = await session.scalar(select(exists().where(ProfileVideo.video_id == video.id)))
     if not kept:
         await session.delete(video)
