@@ -16,6 +16,7 @@ from app.schemas import (
     PlaylistItemOut,
     PlaylistOut,
     WatchIn,
+    WatchProgressOut,
 )
 from app.services.library import in_library
 from app.services.profiles import ProfileDep
@@ -54,6 +55,14 @@ async def record_watch(
         .on_conflict_do_update(index_elements=["profile_id", "video_id"], set_=values)
     )
     await session.commit()
+
+
+@router.get("/history/progress", response_model=list[WatchProgressOut])
+async def watch_progress(session: SessionDep, profile: ProfileDep) -> list[WatchEntry]:
+    """Where the profile left every video it watched, for the red bars and for resuming."""
+    return list(
+        await session.scalars(select(WatchEntry).where(WatchEntry.profile_id == profile.id))
+    )
 
 
 @router.get("/history", response_model=HistoryPage)

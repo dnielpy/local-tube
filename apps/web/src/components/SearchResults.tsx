@@ -8,11 +8,11 @@ import { browser } from "react-dom";
 
 import { api, queryKeys, type Video } from "@/lib/api";
 import { channelHref, timeAgo } from "@/lib/format";
+import { useWatchedFraction } from "@/lib/watch-progress";
 
 import { ChannelPhoto } from "./ChannelPhoto";
 import { SearchIcon } from "./icons";
 import { Thumbnail } from "./Thumbnail";
-import { useWatchedFraction } from "./VideoCard";
 import { VideoMenu } from "./VideoMenu";
 
 export function SearchResults() {

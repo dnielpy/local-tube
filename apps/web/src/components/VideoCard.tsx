@@ -1,25 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
 
 import type { Video } from "@/lib/api";
 import { channelHref, timeAgo } from "@/lib/format";
-import { watchedFraction } from "@/lib/watch-progress";
+import { useWatchedFraction } from "@/lib/watch-progress";
 
 import { ChannelPhoto } from "./ChannelPhoto";
 import { Thumbnail } from "./Thumbnail";
 import { VideoMenu } from "./VideoMenu";
-
-const noSubscribe = () => () => {};
-
-export function useWatchedFraction(id: string) {
-  return useSyncExternalStore(
-    noSubscribe,
-    () => watchedFraction(id),
-    () => undefined,
-  );
-}
 
 export function VideoCard({ video }: { video: Video }) {
   const watched = useWatchedFraction(video.id);

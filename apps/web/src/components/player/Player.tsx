@@ -1,10 +1,11 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { Video } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
-import { readPosition, savePosition } from "@/lib/watch-progress";
+import { resumePosition, useRecordWatch } from "@/lib/watch-progress";
 
 import {
   FullscreenExitIcon,
@@ -49,6 +50,8 @@ export function Player({
   onToggleTheater: () => void;
   onNext?: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const recordWatch = useRecordWatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -166,7 +169,7 @@ export function Player({
   useEffect(() => {
     const v = el();
     if (!v) return;
-    const save = () => savePosition(video.id, v.currentTime, v.duration);
+    const save = () => recordWatch(video.id, v.currentTime, v.duration);
     const interval = setInterval(() => !v.paused && save(), 5000);
     v.addEventListener("pause", save);
     window.addEventListener("pagehide", save);
@@ -176,16 +179,18 @@ export function Player({
       v.removeEventListener("pause", save);
       window.removeEventListener("pagehide", save);
     };
-  }, [video.id]);
+  }, [video.id, recordWatch]);
 
   function onLoadedMetadata() {
     const v = el();
     if (!v) return;
     setDuration(v.duration);
     v.playbackRate = rate;
-    const saved = readPosition(video.id);
-    if (saved && saved.time < v.duration - 10) v.currentTime = saved.time;
-    v.play().catch(() => {});
+    // Start where the profile left the video, as YouTube does.
+    resumePosition(queryClient, video.id).then((start) => {
+      if (start > 0 && start < v.duration) v.currentTime = start;
+      v.play().catch(() => {});
+    });
   }
 
   function onProgress() {
@@ -355,7 +360,8 @@ export function Player({
         onEnded={() => {
           setPlaying(false);
           setEnded(true);
-          savePosition(video.id, 0, 0);
+          const v = el();
+          if (v) recordWatch(video.id, v.duration, v.duration);
         }}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}

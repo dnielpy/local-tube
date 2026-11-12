@@ -190,6 +190,14 @@ class WatchIn(BaseModel):
     duration: float | None = Field(default=None, ge=0)
 
 
+class WatchProgressOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    video_id: uuid.UUID
+    position: float
+    duration: float | None
+
+
 class HistoryEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

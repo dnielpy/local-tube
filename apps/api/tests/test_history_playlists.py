@@ -124,3 +124,12 @@ async def test_removing_a_video_from_the_library_drops_it_from_history_and_playl
 
     assert (await client.get(f"/api/playlists/{playlist['id']}")).json()["count"] == 0
     assert (await client.get("/api/history")).json()["total"] == 0
+
+
+async def test_progress_lists_where_each_video_was_left(client, make_video):
+    video = await make_video("one")
+    await client.put(f"/api/history/{video.id}", json={"position": 42.5, "duration": 120})
+
+    body = (await client.get("/api/history/progress")).json()
+
+    assert body == [{"video_id": str(video.id), "position": 42.5, "duration": 120.0}]

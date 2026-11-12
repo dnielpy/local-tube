@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { api, ApiError, queryKeys } from "@/lib/api";
-import { setProgressProfile } from "@/lib/watch-progress";
 
 import { ProfilePicker } from "./ProfilePicker";
 
@@ -38,7 +37,6 @@ export function ProfileGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  setProgressProfile(session.data.id);
   return children;
 }
 

@@ -6,7 +6,7 @@ import type { Video } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 
 import { Thumbnail } from "./Thumbnail";
-import { useWatchedFraction } from "./VideoCard";
+import { useWatchedFraction } from "@/lib/watch-progress";
 
 export function WatchNext({ videos }: { videos: Video[] }) {
   if (videos.length === 0) return null;

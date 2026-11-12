@@ -13,6 +13,11 @@ export type Status = components["schemas"]["StatusOut"];
 export type VideoFormats = components["schemas"]["VideoFormatsOut"];
 export type Profile = components["schemas"]["ProfileOut"];
 export type CookieStatus = components["schemas"]["CookieStatusOut"];
+export type HistoryPage = components["schemas"]["HistoryPage"];
+export type HistoryEntry = components["schemas"]["HistoryEntryOut"];
+export type WatchProgress = components["schemas"]["WatchProgressOut"];
+export type Playlist = components["schemas"]["PlaylistOut"];
+export type PlaylistDetail = components["schemas"]["PlaylistDetail"];
 
 export class ApiError extends Error {
   constructor(
@@ -81,6 +86,34 @@ export const api = {
   channelVideos: (id: string, offset: number) =>
     request<RemoteVideoPage>(`/channels/${encodeURIComponent(id)}/videos?offset=${offset}`),
   video: (id: string) => request<Video>(`/videos/${id}`),
+  history: (params: { q?: string; limit?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.q) search.set("q", params.q);
+    if (params.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return request<HistoryPage>(`/history${query ? `?${query}` : ""}`);
+  },
+  watchProgress: () => request<WatchProgress[]>("/history/progress"),
+  recordWatch: (id: string, position: number, duration: number | null) =>
+    request<void>(`/history/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ position, duration }),
+      keepalive: true,
+    }),
+  forgetWatch: (id: string) => request<void>(`/history/${id}`, { method: "DELETE" }),
+  clearHistory: () => request<void>("/history", { method: "DELETE" }),
+  playlists: (videoId?: string) =>
+    request<Playlist[]>(`/playlists${videoId ? `?video_id=${videoId}` : ""}`),
+  playlist: (id: string) => request<PlaylistDetail>(`/playlists/${id}`),
+  createPlaylist: (name: string) =>
+    request<Playlist>("/playlists", { method: "POST", body: JSON.stringify({ name }) }),
+  renamePlaylist: (id: string, name: string) =>
+    request<Playlist>(`/playlists/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  deletePlaylist: (id: string) => request<void>(`/playlists/${id}`, { method: "DELETE" }),
+  addToPlaylist: (id: string, videoId: string) =>
+    request<void>(`/playlists/${id}/videos/${videoId}`, { method: "PUT" }),
+  removeFromPlaylist: (id: string, videoId: string) =>
+    request<void>(`/playlists/${id}/videos/${videoId}`, { method: "DELETE" }),
   deleteVideo: (id: string) => request<void>(`/videos/${id}`, { method: "DELETE" }),
   downloads: () => request<DownloadJob[]>("/downloads"),
   formats: (url: string) =>
@@ -100,6 +133,12 @@ export const queryKeys = {
   session: ["session"] as const,
   profiles: ["profiles"] as const,
   cookieStatus: ["cookie-status"] as const,
+  history: (q = "") => ["history", q] as const,
+  allHistory: ["history"] as const,
+  watchProgress: ["watch-progress"] as const,
+  playlists: (videoId?: string) => ["playlists", videoId ?? null] as const,
+  allPlaylists: ["playlists"] as const,
+  playlist: (id: string) => ["playlist", id] as const,
   videos: (params: object = {}) => ["videos", params] as const,
   allVideos: ["videos"] as const,
   channels: ["channels"] as const,
