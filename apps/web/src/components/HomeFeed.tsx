@@ -11,7 +11,7 @@ import { api, queryKeys } from "@/lib/api";
 import { LibraryIcon } from "./icons";
 import { VideoCard, VideoCardSkeleton } from "./VideoCard";
 
-const GRID =
+export const GRID =
   "grid grid-cols-1 gap-x-4 gap-y-10 xs:grid-cols-2 grid3:grid-cols-3 grid4:grid-cols-4 grid5:grid-cols-5";
 
 export function HomeFeed() {
@@ -50,7 +50,7 @@ export function HomeFeed() {
   );
 }
 
-function GridSkeleton() {
+export function GridSkeleton() {
   return (
     <div className={GRID}>
       {Array.from({ length: 12 }, (_, index) => (

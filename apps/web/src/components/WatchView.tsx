@@ -58,7 +58,7 @@ export function WatchView() {
 
   if (!id || video.isError) {
     return (
-      <div className="flex flex-col items-center px-4 py-24 text-center">
+      <div data-watch className="flex flex-col items-center px-4 py-24 text-center">
         <h1 className="text-2xl">Este video no está disponible</h1>
         <p className="mt-2 text-yt-text-secondary">Puede que se haya eliminado de la biblioteca.</p>
         <Link
@@ -86,7 +86,7 @@ export function WatchView() {
   const secondary = library.isPending ? <WatchNextSkeleton /> : <WatchNext videos={others} />;
 
   return (
-    <div className="watch-layout" data-theater={theater}>
+    <div data-watch className="watch-layout" data-theater={theater}>
       <div data-area="player">{player}</div>
       <div data-area="info" className="min-w-0 px-3 search:px-0">
         {video.data ? <VideoInfo video={video.data} /> : <InfoSkeleton />}
