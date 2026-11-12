@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.models import JobStatus
 
@@ -18,7 +18,7 @@ class VideoOut(BaseModel):
     duration_seconds: int | None
     file_size: int | None
     created_at: datetime
-    thumbnail_path: str | None = None
+    thumbnail_path: str | None = Field(default=None, exclude=True)
 
     @computed_field
     @property

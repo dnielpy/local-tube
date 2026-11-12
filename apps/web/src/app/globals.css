@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* YouTube palette. Dark is the default look; light follows the system setting like youtube.com. */
+:root {
+  color-scheme: dark;
+  --yt-bg: #0f0f0f;
+  --yt-menu: #282828;
+  --yt-surface: rgba(255, 255, 255, 0.1);
+  --yt-surface-hover: rgba(255, 255, 255, 0.2);
+  --yt-text: #f1f1f1;
+  --yt-text-secondary: #aaaaaa;
+  --yt-border: #303030;
+  --yt-divider: rgba(255, 255, 255, 0.2);
+  --yt-search-bg: #121212;
+  --yt-search-button: #222222;
+  --yt-search-button-hover: #2f2f2f;
+  --yt-chip-active-bg: #f1f1f1;
+  --yt-chip-active-text: #0f0f0f;
+  --yt-cta-bg: #f1f1f1;
+  --yt-cta-text: #0f0f0f;
+  --yt-cta-hover: #d9d9d9;
+  --yt-link: #3ea6ff;
+  --yt-brand: #ff0000;
+  --yt-error: #ff4e45;
+  --yt-skeleton: rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --yt-bg: #ffffff;
+    --yt-menu: #ffffff;
+    --yt-surface: rgba(0, 0, 0, 0.05);
+    --yt-surface-hover: rgba(0, 0, 0, 0.1);
+    --yt-text: #0f0f0f;
+    --yt-text-secondary: #606060;
+    --yt-border: #d3d3d3;
+    --yt-divider: rgba(0, 0, 0, 0.1);
+    --yt-search-bg: #ffffff;
+    --yt-search-button: #f8f8f8;
+    --yt-search-button-hover: #f0f0f0;
+    --yt-chip-active-bg: #0f0f0f;
+    --yt-chip-active-text: #ffffff;
+    --yt-cta-bg: #0f0f0f;
+    --yt-cta-text: #ffffff;
+    --yt-cta-hover: #272727;
+    --yt-link: #065fd4;
+    --yt-error: #cc0000;
+    --yt-skeleton: rgba(0, 0, 0, 0.1);
+  }
+}
+
+@theme inline {
+  --color-yt-bg: var(--yt-bg);
+  --color-yt-menu: var(--yt-menu);
+  --color-yt-surface: var(--yt-surface);
+  --color-yt-surface-hover: var(--yt-surface-hover);
+  --color-yt-text: var(--yt-text);
+  --color-yt-text-secondary: var(--yt-text-secondary);
+  --color-yt-border: var(--yt-border);
+  --color-yt-divider: var(--yt-divider);
+  --color-yt-search-bg: var(--yt-search-bg);
+  --color-yt-search-button: var(--yt-search-button);
+  --color-yt-search-button-hover: var(--yt-search-button-hover);
+  --color-yt-chip-active-bg: var(--yt-chip-active-bg);
+  --color-yt-chip-active-text: var(--yt-chip-active-text);
+  --color-yt-cta-bg: var(--yt-cta-bg);
+  --color-yt-cta-text: var(--yt-cta-text);
+  --color-yt-cta-hover: var(--yt-cta-hover);
+  --color-yt-link: var(--yt-link);
+  --color-yt-brand: var(--yt-brand);
+  --color-yt-error: var(--yt-error);
+  --color-yt-skeleton: var(--yt-skeleton);
+  --font-sans: var(--font-roboto), Arial, sans-serif;
+}
+
+@theme {
+  /* youtube.com breakpoints: mini guide from 792px, full guide from 1313px. */
+  --breakpoint-xs: 500px;
+  --breakpoint-search: 657px;
+  --breakpoint-mini: 792px;
+  --breakpoint-watch: 1017px;
+  --breakpoint-grid3: 1100px;
+  --breakpoint-guide: 1313px;
+  --breakpoint-grid4: 1600px;
+  --breakpoint-grid5: 2200px;
+}
+
+html,
+body {
+  background: var(--yt-bg);
+  color: var(--yt-text);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #717171 transparent;
+}
+
+@keyframes yt-bezel {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2);
+  }
+}
+
+@keyframes yt-fade {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes yt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes yt-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.yt-skeleton {
+  background: var(--yt-skeleton);
+  animation: yt-pulse 1.5s ease-in-out infinite;
+}
