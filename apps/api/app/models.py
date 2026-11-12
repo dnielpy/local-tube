@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     Enum,
     Float,
@@ -89,6 +90,9 @@ class Profile(Base):
     avatar_path: Mapped[str | None] = mapped_column(Text)
     youtube_name: Mapped[str | None] = mapped_column(Text)
     signed_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # None until YouTube has been asked whether the cookies are still signed in.
+    cookies_valid: Mapped[bool | None] = mapped_column(Boolean)
+    cookies_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     @property

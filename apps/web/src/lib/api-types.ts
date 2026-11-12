@@ -416,6 +416,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/session/cookies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["cookie_status_api_session_cookies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -448,6 +464,10 @@ export interface components {
             subscribed: boolean;
             downloaded_count: number;
             avatar_url?: string | null;
+        };
+        CookieStatusOut: {
+            cookies_valid: boolean | null;
+            cookies_checked_at: string | null;
         };
         CookiesIn: {
             cookies: string;
@@ -1500,6 +1520,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    cookie_status_api_session_cookies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CookieStatusOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

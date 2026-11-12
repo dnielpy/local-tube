@@ -9,13 +9,15 @@ import { browser } from "react-dom";
 import { api, queryKeys } from "@/lib/api";
 import { channelHref } from "@/lib/format";
 import {
-  useOnline,
+  CONNECTION_COLORS,
+  useConnection,
   useRefetchOnStatusChange,
   useSetForcedOffline,
   useStatus,
 } from "@/lib/use-status";
 
 import { ChannelPhoto } from "./ChannelPhoto";
+import { CookiesDialog } from "./profiles/ProfileMenu";
 import {
   CollapseIcon,
   DownloadFilledIcon,
@@ -46,28 +48,46 @@ function GuideStatus() {
   use(browser("The online status comes from the api."));
   useRefetchOnStatusChange();
   const status = useStatus();
+  const connection = useConnection();
+  const session = useQuery({ queryKey: queryKeys.session, queryFn: api.session, enabled: false });
+  const [updating, setUpdating] = useState(false);
   const setForcedOffline = useSetForcedOffline();
-  const online = status.data?.online ?? false;
   const forced = status.data?.forced_offline ?? false;
-  const detail = forced
-    ? "Modo sin conexión activado"
-    : online
-      ? "Conectado a YouTube"
-      : "YouTube no responde";
+  const expired = connection?.tone === "expired";
+
+  const summary = (
+    <>
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        <span
+          className={`size-[10px] rounded-full ${
+            connection ? CONNECTION_COLORS[connection.tone] : "bg-[#717171]"
+          }`}
+        />
+      </span>
+      <span className="min-w-0 text-left">
+        <span className="block text-sm font-medium">{connection?.label ?? "Comprobando…"}</span>
+        <span className="block truncate text-xs text-yt-text-secondary">{connection?.detail}</span>
+      </span>
+    </>
+  );
 
   return (
     <section className="border-b border-yt-divider px-3 py-3">
-      <div className="flex items-center gap-6 px-3 py-2">
-        <span className="flex size-6 items-center justify-center">
-          <span
-            className={`size-[10px] rounded-full ${online ? "bg-[#2ba640]" : "bg-[#717171]"}`}
-          />
-        </span>
-        <div className="min-w-0">
-          <p className="text-sm font-medium">{online ? "En línea" : "Sin conexión"}</p>
-          <p className="truncate text-xs text-yt-text-secondary">{detail}</p>
-        </div>
-      </div>
+      {expired && session.data ? (
+        <button
+          type="button"
+          onClick={() => setUpdating(true)}
+          title="Actualizar cookies de YouTube"
+          className="flex w-full items-center gap-6 rounded-[10px] px-3 py-2 hover:bg-yt-surface"
+        >
+          {summary}
+        </button>
+      ) : (
+        <div className="flex items-center gap-6 px-3 py-2">{summary}</div>
+      )}
+      {updating && session.data && (
+        <CookiesDialog profile={session.data} onClose={() => setUpdating(false)} />
+      )}
       <button
         type="button"
         role="switch"
@@ -138,12 +158,12 @@ function GuideChannels() {
 
 function MiniStatusDot() {
   use(browser("The online status comes from the api."));
-  const online = useOnline();
+  const connection = useConnection();
   return (
     <span
-      title={online ? "En línea" : "Sin conexión"}
+      title={connection?.label}
       className={`absolute top-3 right-4 size-2 rounded-full ring-2 ring-yt-bg ${
-        online ? "bg-[#2ba640]" : "bg-[#717171]"
+        connection ? CONNECTION_COLORS[connection.tone] : "bg-[#717171]"
       }`}
     />
   );

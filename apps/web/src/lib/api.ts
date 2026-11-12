@@ -12,6 +12,7 @@ export type RemoteVideoPage = components["schemas"]["RemoteVideoPage"];
 export type Status = components["schemas"]["StatusOut"];
 export type VideoFormats = components["schemas"]["VideoFormatsOut"];
 export type Profile = components["schemas"]["ProfileOut"];
+export type CookieStatus = components["schemas"]["CookieStatusOut"];
 
 export class ApiError extends Error {
   constructor(
@@ -46,6 +47,7 @@ export const api = {
   profiles: () => request<Profile[]>("/profiles"),
   session: () => request<Profile>("/session"),
   logout: () => request<void>("/session", { method: "DELETE" }),
+  cookieStatus: () => request<CookieStatus>("/session/cookies"),
   createProfile: (body: { name: string; pin: string; cookies: string }) =>
     request<Profile>("/profiles", { method: "POST", body: JSON.stringify(body) }),
   unlockProfile: (id: string, pin: string) =>
@@ -97,6 +99,7 @@ export const api = {
 export const queryKeys = {
   session: ["session"] as const,
   profiles: ["profiles"] as const,
+  cookieStatus: ["cookie-status"] as const,
   videos: (params: object = {}) => ["videos", params] as const,
   allVideos: ["videos"] as const,
   channels: ["channels"] as const,

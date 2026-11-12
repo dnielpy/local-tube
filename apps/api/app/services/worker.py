@@ -23,6 +23,7 @@ from app.services.image_cache import ImageFetcher, cache_image
 from app.services.library import link_video
 from app.services.profiles import cookies_path
 from app.services.youtube import video_thumbnail_url
+from app.services.youtube_cookies import mark_expired, needs_sign_in
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,8 @@ class DownloadWorker:
             await _update_job(job_id, status=JobStatus.cancelled, error=None, speed=None, eta=None)
         except DownloadError as exc:
             await _update_job(job_id, status=JobStatus.failed, error=str(exc), speed=None, eta=None)
+            if profile_id is not None and needs_sign_in(str(exc)):
+                await mark_expired(profile_id)
         except Exception as exc:
             logger.exception("download %s failed", job_id)
             await _update_job(job_id, status=JobStatus.failed, error=str(exc), speed=None, eta=None)

@@ -174,5 +174,12 @@ class ProfileCreate(CookiesIn):
         return value
 
 
+class CookieStatusOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    cookies_valid: bool | None
+    cookies_checked_at: datetime | None
+
+
 class PinIn(BaseModel):
     pin: str = Field(pattern=PIN_PATTERN)

@@ -88,7 +88,7 @@ export function ProfileMenu() {
   );
 }
 
-function CookiesDialog({ profile, onClose }: { profile: Profile; onClose: () => void }) {
+export function CookiesDialog({ profile, onClose }: { profile: Profile; onClose: () => void }) {
   const client = useQueryClient();
   const [cookies, setCookies] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +98,7 @@ function CookiesDialog({ profile, onClose }: { profile: Profile; onClose: () => 
       client.setQueryData(queryKeys.session, updated);
       client.invalidateQueries({ queryKey: queryKeys.profiles });
       client.invalidateQueries({ queryKey: queryKeys.channels });
+      client.invalidateQueries({ queryKey: queryKeys.cookieStatus });
       onClose();
     },
     onError: (failure) => setError(cookiesError(failure)),

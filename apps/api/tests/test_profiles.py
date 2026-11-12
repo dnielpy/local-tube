@@ -1,12 +1,17 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from sqlalchemy import update
+
 from app.db import SessionLocal
-from app.models import Video
+from app.models import Profile, Video
 from app.services.connectivity import connectivity
 from app.services.profiles import SESSION_COOKIE, cookies_path
+from app.services.worker import DownloadWorker
 from app.services.youtube_cookies import Account, normalize
 from tests.conftest import COOKIES
+from tests.test_downloads import URL, FakeDownloader
 
 
 async def create(client, name="Ana", pin="1234", cookies=COOKIES):
@@ -214,3 +219,46 @@ async def test_delete_profile_needs_its_pin(anon_client):
     assert (await anon_client.get("/api/profiles")).json() == []
     assert cookies_path(uuid.UUID(profile["id"])) is None
     assert (await anon_client.get("/api/session")).status_code == 401
+
+
+async def test_cookie_status_comes_from_the_last_check(anon_client, account):
+    await create(anon_client)
+
+    body = (await anon_client.get("/api/session/cookies")).json()
+
+    assert body["cookies_valid"] is True
+    assert len(account.files) == 1
+
+
+async def test_cookie_status_asks_youtube_again_when_the_check_is_old(anon_client, account):
+    profile = (await create(anon_client)).json()
+    async with SessionLocal() as session, session.begin():
+        await session.execute(
+            update(Profile)
+            .where(Profile.id == uuid.UUID(profile["id"]))
+            .values(cookies_checked_at=datetime.now(UTC) - timedelta(hours=1))
+        )
+    account.account = Account(logged_in=False)
+
+    body = (await anon_client.get("/api/session/cookies")).json()
+
+    assert body["cookies_valid"] is False
+    assert account.files[-1] == cookies_path(uuid.UUID(profile["id"]))
+
+
+async def test_cookie_status_is_unknown_without_a_connection(anon_client, account):
+    connectivity.forced_offline = True
+    await create(anon_client)
+
+    assert (await anon_client.get("/api/session/cookies")).json()["cookies_valid"] is None
+
+
+async def test_bot_check_on_a_download_marks_the_cookies_expired(client, profile, media_root):
+    await client.post("/api/downloads", json={"url": URL})
+    downloader = FakeDownloader(
+        media_root, fail_with="[youtube] abc: Sign in to confirm you're not a bot"
+    )
+
+    await DownloadWorker(downloader).run_once()
+
+    assert (await client.get("/api/session/cookies")).json()["cookies_valid"] is False

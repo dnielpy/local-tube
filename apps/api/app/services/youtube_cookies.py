@@ -1,22 +1,27 @@
+import asyncio
 import json
 import logging
 import os
 import re
 import tempfile
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from http.cookiejar import MozillaCookieJar
 
 import httpx
 
+from app.db import SessionLocal
 from app.models import Profile
 from app.services.connectivity import connectivity
 from app.services.image_cache import ImageFetcher, cache_image, http_fetch
-from app.services.profiles import profile_dir
+from app.services.profiles import cookies_path, profile_dir
 from app.services.youtube import sized_image
 
 logger = logging.getLogger(__name__)
+
+CHECK_INTERVAL = timedelta(minutes=30)
 
 HEADER = "# Netscape HTTP Cookie File"
 HTTP_ONLY = "#HttpOnly_"
@@ -128,6 +133,31 @@ class YouTubeCookies:
     ) -> None:
         self.read = read
         self.fetch = fetch
+        self._locks: dict[uuid.UUID, asyncio.Lock] = {}
+
+    async def status(self, profile_id: uuid.UUID) -> Profile:
+        """The profile with its cookie status, asking YouTube again when the last check is old."""
+        async with self._locks.setdefault(profile_id, asyncio.Lock()):
+            async with SessionLocal() as session:
+                profile = await session.get_one(Profile, profile_id)
+                checked = profile.cookies_checked_at
+                path = cookies_path(profile_id)
+                if (
+                    not connectivity.online
+                    or path is None
+                    or (checked is not None and datetime.now(UTC) - checked < CHECK_INTERVAL)
+                ):
+                    return profile
+                try:
+                    account = await self.read(path)
+                except Exception:
+                    logger.exception("could not check the cookies of %s", profile_id)
+                    account = None
+                if account is not None:
+                    profile.cookies_valid = account.logged_in
+                    profile.cookies_checked_at = datetime.now(UTC)
+                    await session.commit()
+                return profile
 
     async def check(self, text: str) -> tuple[str, Account | None]:
         """Clean up pasted cookies and, when online, make sure YouTube accepts them."""
@@ -157,6 +187,8 @@ class YouTubeCookies:
         os.chmod(temporary, 0o600)
         temporary.replace(path)
         profile.signed_in_at = datetime.now(UTC)
+        profile.cookies_valid = account.logged_in if account else None
+        profile.cookies_checked_at = profile.signed_in_at if account else None
         if account is None:
             return
         profile.youtube_name = account.name or profile.youtube_name
@@ -167,3 +199,16 @@ class YouTubeCookies:
             self.fetch,
             profile.avatar_path,
         )
+
+
+def needs_sign_in(error: str) -> bool:
+    """yt-dlp errors that mean YouTube no longer accepts the cookies."""
+    return "Sign in to confirm" in error or "cookies are no longer valid" in error
+
+
+async def mark_expired(profile_id: uuid.UUID) -> None:
+    async with SessionLocal() as session, session.begin():
+        profile = await session.get(Profile, profile_id)
+        if profile is not None:
+            profile.cookies_valid = False
+            profile.cookies_checked_at = datetime.now(UTC)

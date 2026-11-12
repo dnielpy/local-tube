@@ -10,7 +10,7 @@ from app.db import SessionDep
 from app.media import media_path
 from app.models import Profile
 from app.routers.channels import ServiceDep
-from app.schemas import CookiesIn, PinIn, ProfileCreate, ProfileOut
+from app.schemas import CookiesIn, CookieStatusOut, PinIn, ProfileCreate, ProfileOut
 from app.services.image_cache import remove_cached
 from app.services.library import claim_orphans
 from app.services.profiles import (
@@ -156,6 +156,11 @@ async def profile_avatar(profile_id: uuid.UUID, session: SessionDep) -> FileResp
 @router.get("/session", response_model=ProfileOut)
 async def get_session(current: ProfileDep) -> Profile:
     return current
+
+
+@router.get("/session/cookies", response_model=CookieStatusOut)
+async def cookie_status(current: ProfileDep, cookies: CookiesDep) -> Profile:
+    return await cookies.status(current.id)
 
 
 @router.delete("/session", status_code=status.HTTP_204_NO_CONTENT)
