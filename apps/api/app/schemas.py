@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
@@ -170,3 +171,8 @@ class ProfileCreate(BaseModel):
 
 class PinIn(BaseModel):
     pin: str = Field(pattern=PIN_PATTERN)
+
+
+class LoginOut(BaseModel):
+    state: Literal["waiting", "ready", "idle"]
+    profile: ProfileOut | None = None

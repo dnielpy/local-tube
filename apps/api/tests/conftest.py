@@ -21,9 +21,12 @@ from app.db import SessionLocal, engine
 from app.main import app
 from app.models import Base, Profile, ProfileStatus, Video
 from app.routers.channels import get_channel_service
+from app.routers.profiles import get_login
+from app.services.browser import BrowserError, BrowserSession
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity
 from app.services.library import link_video
+from app.services.login import LoginService
 from app.services.profiles import SESSION_COOKIE, hash_pin, pin_guard, session_token
 
 
@@ -212,3 +215,45 @@ def channel_service(youtube: FakeYouTube, fetch: FakeFetch):
     app.dependency_overrides[get_channel_service] = lambda: service
     yield service
     app.dependency_overrides.pop(get_channel_service, None)
+
+
+class FakeBrowser:
+    COOKIES = "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSAPISID\tabc\n"
+
+    def __init__(self) -> None:
+        self.profile_id = None
+        self.running = False
+        self.signed_in = False
+        self.fail = False
+        self.calls: list[str] = []
+
+    async def start(self, profile_id) -> None:
+        if self.fail:
+            raise BrowserError("connection refused")
+        self.calls.append("start")
+        self.profile_id, self.running, self.signed_in = profile_id, True, False
+
+    async def session(self) -> BrowserSession:
+        if not self.signed_in:
+            return BrowserSession(profile_id=self.profile_id, running=self.running)
+        return BrowserSession(
+            profile_id=self.profile_id,
+            running=self.running,
+            signed_in=True,
+            cookies=self.COOKIES,
+            name="Daniel Quesada",
+            avatar_url="https://yt3.ggpht.com/photo=s88-c-k",
+        )
+
+    async def stop(self) -> None:
+        self.calls.append("stop")
+        self.running = False
+
+
+@pytest.fixture(autouse=True)
+def browser(channel_service, fetch) -> FakeBrowser:
+    fake = FakeBrowser()
+    login = LoginService(fake, channel_service, fetch)
+    app.dependency_overrides[get_login] = lambda: login
+    yield fake
+    app.dependency_overrides.pop(get_login, None)
