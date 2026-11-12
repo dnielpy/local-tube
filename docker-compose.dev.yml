@@ -10,5 +10,17 @@ services:
     volumes:
       - pgdata-dev:/var/lib/postgresql/data
 
+  browser:
+    build: ./apps/browser
+    shm_size: 1gb
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+    ports:
+      - "3010:3000"
+      - "9000:9000"
+    volumes:
+      - ./config:/data
+
 volumes:
   pgdata-dev:
