@@ -44,6 +44,54 @@ class DownloadResult:
     file_size: int | None
 
 
+@dataclass
+class Quality:
+    height: int
+    size_bytes: int | None
+
+
+@dataclass
+class VideoFormats:
+    youtube_id: str
+    title: str
+    channel: str | None
+    duration_seconds: int | None
+    qualities: list[Quality]
+
+
+def _size(fmt: dict[str, Any]) -> int | None:
+    size = fmt.get("filesize") or fmt.get("filesize_approx")
+    return int(size) if size else None
+
+
+def available_qualities(formats: list[dict[str, Any]]) -> list[Quality]:
+    heights = sorted(
+        {
+            int(f["height"])
+            for f in formats
+            if f.get("height") and f["height"] >= 144 and f.get("vcodec") not in (None, "none")
+        }
+    )
+    context = {
+        "formats": formats,
+        "has_merged_format": any("none" not in (f.get("acodec"), f.get("vcodec")) for f in formats),
+        "incomplete_formats": False,
+    }
+    qualities: dict[int, Quality] = {}
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+        for height in heights:
+            selector = ydl.build_format_selector(format_selector(height))
+            chosen = next(iter(selector(dict(context))), None)
+            if not chosen or not chosen.get("height"):
+                continue
+            parts = chosen.get("requested_formats") or [chosen]
+            sizes = [_size(part) for part in parts]
+            size = sum(sizes) if all(size is not None for size in sizes) else None
+            actual = int(chosen["height"])
+            qualities[actual] = Quality(height=actual, size_bytes=size)
+    return [qualities[height] for height in sorted(qualities)]
+
+
 class DownloadError(Exception):
     pass
 
@@ -110,6 +158,24 @@ class YtDlpDownloader:
         if info is None or info.get("_type", "video") not in ("video", "url"):
             raise DownloadError("Only single videos are supported, not playlists or channels")
         return Probe(youtube_id=info["id"], title=info.get("title"), info=info)
+
+    def formats(self, url: str) -> VideoFormats:
+        try:
+            with yt_dlp.YoutubeDL(
+                {**base_options(self.cookies_file, self.cookies_from_browser), "noplaylist": True}
+            ) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except yt_dlp.utils.YoutubeDLError as exc:
+            raise DownloadError(clean_error(exc)) from exc
+        if info is None or info.get("_type", "video") != "video":
+            raise DownloadError("Only single videos are supported, not playlists or channels")
+        return VideoFormats(
+            youtube_id=info["id"],
+            title=info.get("title") or info["id"],
+            channel=info.get("channel") or info.get("uploader"),
+            duration_seconds=int(info["duration"]) if info.get("duration") else None,
+            qualities=available_qualities(info.get("formats") or []),
+        )
 
     def download(
         self,

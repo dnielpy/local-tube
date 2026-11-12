@@ -27,12 +27,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         YtDlpYouTubeClient(settings.cookies_file, settings.cookies_from_browser)
     )
     app.state.channel_service = channel_service
+    downloader = YtDlpDownloader(
+        settings.media_root, settings.cookies_file, settings.cookies_from_browser
+    )
+    app.state.downloader = downloader
     worker = None
     backfill = None
     if settings.worker_enabled:
-        downloader = YtDlpDownloader(
-            settings.media_root, settings.cookies_file, settings.cookies_from_browser
-        )
         worker = DownloadWorker(
             downloader,
             settings.download_concurrency,

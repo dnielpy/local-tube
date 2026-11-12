@@ -52,6 +52,21 @@ class DownloadCreate(BaseModel):
         return value
 
 
+class QualityOut(BaseModel):
+    height: int
+    size_bytes: int | None
+
+
+class VideoFormatsOut(BaseModel):
+    youtube_id: str
+    title: str
+    channel: str | None
+    duration_seconds: int | None
+    qualities: list[QualityOut]
+    default_height: int | None
+    video_id: uuid.UUID | None
+
+
 class DownloadJobOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

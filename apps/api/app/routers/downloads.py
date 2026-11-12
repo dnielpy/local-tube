@@ -1,14 +1,16 @@
+import asyncio
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from app.config import get_settings
 from app.db import SessionDep
 from app.models import DownloadJob, JobStatus, Video
-from app.schemas import DownloadCreate, DownloadJobOut
-from app.services.downloader import parse_youtube_id
+from app.schemas import DownloadCreate, DownloadJobOut, QualityOut, VideoFormatsOut
+from app.services.connectivity import connectivity
+from app.services.downloader import DownloadError, Quality, YtDlpDownloader, parse_youtube_id
 from app.services.worker import ACTIVE_STATUSES, DownloadWorker
 
 router = APIRouter(prefix="/downloads", tags=["downloads"])
@@ -21,6 +23,28 @@ def get_worker(request: Request) -> DownloadWorker | None:
 WorkerDep = Annotated[DownloadWorker | None, Depends(get_worker)]
 
 
+def get_downloader(request: Request) -> YtDlpDownloader:
+    return request.app.state.downloader
+
+
+DownloaderDep = Annotated[YtDlpDownloader, Depends(get_downloader)]
+
+
+def default_height(qualities: list[Quality], preferred: int) -> int | None:
+    if not qualities:
+        return None
+    heights = [quality.height for quality in qualities]
+    lower = [height for height in heights if height <= preferred]
+    return max(lower) if lower else min(heights)
+
+
+def _validate_url(url: str) -> str:
+    url = url.strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Paste a full video URL")
+    return url
+
+
 async def _get_job(session: SessionDep, job_id: uuid.UUID) -> DownloadJob:
     job = await session.get(DownloadJob, job_id)
     if job is None:
@@ -28,13 +52,34 @@ async def _get_job(session: SessionDep, job_id: uuid.UUID) -> DownloadJob:
     return job
 
 
+@router.get("/formats", response_model=VideoFormatsOut)
+async def video_formats(
+    session: SessionDep, downloader: DownloaderDep, url: Annotated[str, Query()]
+) -> VideoFormatsOut:
+    url = _validate_url(url)
+    if not connectivity.online:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, {"message": "Sin conexión"})
+    try:
+        info = await asyncio.to_thread(downloader.formats, url)
+    except DownloadError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    video_id = await session.scalar(select(Video.id).where(Video.youtube_id == info.youtube_id))
+    return VideoFormatsOut(
+        youtube_id=info.youtube_id,
+        title=info.title,
+        channel=info.channel,
+        duration_seconds=info.duration_seconds,
+        qualities=[QualityOut(height=q.height, size_bytes=q.size_bytes) for q in info.qualities],
+        default_height=default_height(info.qualities, get_settings().default_max_height),
+        video_id=video_id,
+    )
+
+
 @router.post("", response_model=DownloadJobOut, status_code=status.HTTP_201_CREATED)
 async def create_download(
     body: DownloadCreate, session: SessionDep, worker: WorkerDep
 ) -> DownloadJob:
-    url = body.url.strip()
-    if not url.startswith(("http://", "https://")):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Paste a full video URL")
+    url = _validate_url(body.url)
 
     youtube_id = parse_youtube_id(url)
     if youtube_id is not None:
