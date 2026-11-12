@@ -4,10 +4,12 @@ import secrets
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Cookie, Depends, HTTPException, Response, status
 
+from app.config import get_settings
 from app.db import SessionDep
 from app.models import Profile, ProfileStatus
 from app.settings_store import read_setting, write_setting
@@ -19,6 +21,18 @@ MAX_FAILURES = 5
 LOCKOUT_SECONDS = 60
 
 _secret: bytes | None = None
+
+
+def profile_dir(profile_id: uuid.UUID) -> Path:
+    return get_settings().profiles_root / str(profile_id)
+
+
+def cookies_path(profile_id: uuid.UUID | None) -> str | None:
+    """The cookies.txt yt-dlp uses for a profile, when it has signed in to YouTube."""
+    if profile_id is None:
+        return None
+    path = profile_dir(profile_id) / "cookies.txt"
+    return str(path) if path.is_file() else None
 
 
 def hash_pin(pin: str) -> str:

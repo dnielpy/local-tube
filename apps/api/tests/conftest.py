@@ -8,6 +8,7 @@ os.environ.setdefault(
     "DATABASE_URL", "postgresql+asyncpg://localtube:localtube@localhost:5442/localtube_test"
 )
 os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="localtube-media-")
+os.environ["PROFILES_ROOT"] = tempfile.mkdtemp(prefix="localtube-profiles-")
 os.environ["WORKER_ENABLED"] = "false"
 os.environ["CONNECTIVITY_CHECK"] = "false"
 
@@ -22,6 +23,7 @@ from app.models import Base, Profile, ProfileStatus, Video
 from app.routers.channels import get_channel_service
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity
+from app.services.library import link_video
 from app.services.profiles import SESSION_COOKIE, hash_pin, pin_guard, session_token
 
 
@@ -88,8 +90,25 @@ async def client(profile: Profile) -> AsyncIterator[AsyncClient]:
 
 
 @pytest.fixture
-def make_video(media_root: Path) -> Callable[..., Awaitable[Video]]:
-    async def factory(youtube_id: str = "abc123", **overrides: object) -> Video:
+async def client_for() -> AsyncIterator[Callable[[Profile], Awaitable[AsyncClient]]]:
+    clients: list[AsyncClient] = []
+
+    async def factory(profile: Profile) -> AsyncClient:
+        c = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+        c.cookies.set(SESSION_COOKIE, await session_token(profile.id))
+        clients.append(c)
+        return c
+
+    yield factory
+    for c in clients:
+        await c.aclose()
+
+
+@pytest.fixture
+def make_video(media_root: Path, profile: Profile) -> Callable[..., Awaitable[Video]]:
+    async def factory(
+        youtube_id: str = "abc123", owners: list[Profile] | None = None, **overrides: object
+    ) -> Video:
         directory = media_root / youtube_id
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "video.mp4").write_bytes(bytes(range(256)) * 4)
@@ -109,6 +128,9 @@ def make_video(media_root: Path) -> Callable[..., Awaitable[Video]]:
         async with SessionLocal() as session:
             video = Video(**fields)
             session.add(video)
+            await session.flush()
+            for owner in [profile] if owners is None else owners:
+                await link_video(session, owner.id, video.id)
             await session.commit()
             return video
 
@@ -120,6 +142,7 @@ class FakeYouTube:
         from app.services.youtube import ChannelPage, RemoteChannel, RemoteVideo
 
         self.calls: list[str] = []
+        self.cookies: list[str | None] = []
         self.subs = [
             RemoteChannel(
                 id="UCaaa", name="Alpha", handle="@alpha", avatar_url="https://img/a=s176"
@@ -151,8 +174,9 @@ class FakeYouTube:
             )
         }
 
-    def subscriptions(self):
+    def subscriptions(self, cookies_file=None):
         self.calls.append("subscriptions")
+        self.cookies.append(cookies_file)
         return self.subs
 
     def channel(self, channel_id, limit=10, start=0):

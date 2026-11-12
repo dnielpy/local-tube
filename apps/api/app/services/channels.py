@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -7,9 +8,10 @@ from sqlalchemy import delete, select, update
 
 from app.db import SessionLocal
 from app.media import media_path
-from app.models import Channel, ChannelVideo, Video
+from app.models import Channel, ChannelVideo, ProfileSubscription, Video
 from app.services.connectivity import connectivity
 from app.services.image_cache import ImageFetcher, cache_image, http_fetch, remove_cached
+from app.services.profiles import cookies_path
 from app.services.youtube import ChannelPage, RemoteChannel, YouTubeError
 from app.settings_store import read_setting, write_setting
 
@@ -25,13 +27,21 @@ SUBSCRIPTIONS_SYNCED_KEY = "subscriptions_synced_at"
 
 
 class YouTubeClient(Protocol):
-    def subscriptions(self) -> list[RemoteChannel]: ...
+    def subscriptions(self, cookies_file: str | None = None) -> list[RemoteChannel]: ...
 
     def channel(self, channel_id: str, limit: int = 10, start: int = 0) -> ChannelPage: ...
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _synced_key(profile_id: uuid.UUID) -> str:
+    return f"{SUBSCRIPTIONS_SYNCED_KEY}:{profile_id}"
+
+
+def _subscriptions_task(profile_id: uuid.UUID) -> str:
+    return f"subscriptions:{profile_id}"
 
 
 class ChannelService:
@@ -59,8 +69,8 @@ class ChannelService:
         while running := [task for task in self._running.values() if not task.done()]:
             await asyncio.gather(*running, return_exceptions=True)
 
-    async def subscriptions_stale(self) -> bool:
-        synced = await read_setting(SUBSCRIPTIONS_SYNCED_KEY)
+    async def subscriptions_stale(self, profile_id: uuid.UUID) -> bool:
+        synced = await read_setting(_synced_key(profile_id))
         return not synced or _now() - datetime.fromisoformat(synced) >= SUBSCRIPTIONS_TTL
 
     async def channel_stale(self, channel_id: str) -> bool:
@@ -72,12 +82,13 @@ class ChannelService:
             or _now() - channel.videos_fetched_at >= CHANNEL_TTL
         )
 
-    async def schedule_subscriptions(self, force: bool = False) -> bool:
+    async def schedule_subscriptions(self, profile_id: uuid.UUID, force: bool = False) -> bool:
         if not connectivity.online:
             return False
-        if force or await self.subscriptions_stale():
-            return self._spawn("subscriptions", self.sync_subscriptions(force=force))
-        return self.is_running("subscriptions")
+        key = _subscriptions_task(profile_id)
+        if force or await self.subscriptions_stale(profile_id):
+            return self._spawn(key, self.sync_subscriptions(profile_id, force=force))
+        return self.is_running(key)
 
     async def schedule_channel(self, channel_id: str, force: bool = False) -> bool:
         if not connectivity.online:
@@ -86,22 +97,25 @@ class ChannelService:
             return self._spawn(channel_id, self.refresh_channel(channel_id, force=force))
         return self.is_running(channel_id)
 
-    async def sync_subscriptions(self, force: bool = False) -> bool:
+    async def sync_subscriptions(self, profile_id: uuid.UUID, force: bool = False) -> bool:
         if not connectivity.online:
             return False
-        async with self._lock("subscriptions"):
-            if not force and not await self.subscriptions_stale():
+        async with self._lock(_subscriptions_task(profile_id)):
+            if not force and not await self.subscriptions_stale(profile_id):
                 return False
             try:
-                remote = await asyncio.to_thread(self.client.subscriptions)
+                remote = await asyncio.to_thread(
+                    self.client.subscriptions, cookies_path(profile_id)
+                )
             except YouTubeError as exc:
-                logger.warning("could not sync subscriptions: %s", exc)
+                logger.warning("could not sync the subscriptions of %s: %s", profile_id, exc)
                 return False
 
             async with SessionLocal() as session:
                 await session.execute(
-                    update(Channel).values(subscribed=False, subscription_rank=None)
+                    delete(ProfileSubscription).where(ProfileSubscription.profile_id == profile_id)
                 )
+                remote = list({item.id: item for item in remote}.values())
                 for rank, item in enumerate(remote):
                     channel = await session.get(Channel, item.id)
                     if channel is None:
@@ -111,10 +125,11 @@ class ChannelService:
                     channel.handle = item.handle or channel.handle
                     channel.description = item.description or channel.description
                     channel.subscriber_count = item.subscriber_count or channel.subscriber_count
-                    channel.subscribed = True
-                    channel.subscription_rank = rank
+                    session.add(
+                        ProfileSubscription(profile_id=profile_id, channel_id=item.id, rank=rank)
+                    )
                 await session.commit()
-            await write_setting(SUBSCRIPTIONS_SYNCED_KEY, _now().isoformat())
+            await write_setting(_synced_key(profile_id), _now().isoformat())
 
             semaphore = asyncio.Semaphore(AVATAR_CONCURRENCY)
 

@@ -20,6 +20,8 @@ from app.services.downloader import (
     Progress,
 )
 from app.services.image_cache import ImageFetcher, cache_image
+from app.services.library import link_video
+from app.services.profiles import cookies_path
 from app.services.youtube import video_thumbnail_url
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ MEDIA_TIMEOUT = 60.0
 
 
 class Downloader(Protocol):
-    def probe(self, url: str) -> Probe: ...
+    def probe(self, url: str, cookies_file: str | None = None) -> Probe: ...
 
     def download(
         self,
@@ -39,6 +41,7 @@ class Downloader(Protocol):
         on_progress: "ProgressCallback",
         max_height: int | None = None,
         should_cancel: Callable[[], bool] = ...,
+        cookies_file: str | None = None,
     ) -> DownloadResult: ...
 
 
@@ -102,10 +105,10 @@ class DownloadWorker:
         claimed = await claim_next_job()
         if claimed is None:
             return False
-        job_id, url, max_height = claimed
+        job_id, url, max_height, profile_id = claimed
         cancelled = self._cancel[job_id] = threading.Event()
         try:
-            await self._process(job_id, url, max_height, cancelled)
+            await self._process(job_id, url, max_height, profile_id, cancelled)
         except DownloadCancelled:
             await _update_job(job_id, status=JobStatus.cancelled, error=None, speed=None, eta=None)
         except DownloadError as exc:
@@ -122,9 +125,11 @@ class DownloadWorker:
         job_id: uuid.UUID,
         url: str,
         max_height: int | None,
+        profile_id: uuid.UUID | None,
         cancelled: threading.Event,
     ) -> None:
-        probe = await asyncio.to_thread(self.downloader.probe, url)
+        cookies_file = cookies_path(profile_id)
+        probe = await asyncio.to_thread(self.downloader.probe, url, cookies_file)
         if cancelled.is_set():
             raise DownloadCancelled("Cancelled")
         duration = probe.info.get("duration")
@@ -144,6 +149,9 @@ class DownloadWorker:
 
         existing = await _find_video(probe.youtube_id)
         if existing is not None:
+            if profile_id is not None:
+                async with SessionLocal() as session, session.begin():
+                    await link_video(session, profile_id, existing.id)
             await _update_job(
                 job_id, status=JobStatus.completed, progress=100, video_id=existing.id
             )
@@ -152,7 +160,12 @@ class DownloadWorker:
         latest: list[Progress] = []
         download = asyncio.create_task(
             asyncio.to_thread(
-                self.downloader.download, probe, latest.append, max_height, cancelled.is_set
+                self.downloader.download,
+                probe,
+                latest.append,
+                max_height,
+                cancelled.is_set,
+                cookies_file,
             )
         )
         while not download.done():
@@ -181,6 +194,8 @@ class DownloadWorker:
                 video = Video(**vars(result))
                 session.add(video)
                 await session.flush()
+            if profile_id is not None:
+                await link_video(session, profile_id, video.id)
             job = await session.get_one(DownloadJob, job_id)
             job.status = JobStatus.completed
             job.progress = 100
@@ -190,7 +205,7 @@ class DownloadWorker:
             await session.commit()
 
 
-async def claim_next_job() -> tuple[uuid.UUID, str, int | None] | None:
+async def claim_next_job() -> tuple[uuid.UUID, str, int | None, uuid.UUID | None] | None:
     async with SessionLocal() as session, session.begin():
         job = await session.scalar(
             select(DownloadJob)
@@ -204,7 +219,7 @@ async def claim_next_job() -> tuple[uuid.UUID, str, int | None] | None:
         job.status = JobStatus.downloading
         job.progress = 0
         job.error = None
-        return job.id, job.url, job.max_height
+        return job.id, job.url, job.max_height, job.profile_id
 
 
 async def requeue_interrupted_jobs() -> None:

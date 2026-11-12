@@ -11,8 +11,7 @@ class Settings(BaseSettings):
     media_root: Path = Path("./media")
     download_concurrency: int = 1
     worker_enabled: bool = True
-    cookies_file: str | None = None
-    cookies_from_browser: str | None = None
+    profiles_root: Path = Path("./config/profiles")
     default_max_height: int = 360
     connectivity_check: bool = True
     connectivity_url: str = "https://www.youtube.com/generate_204"

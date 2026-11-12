@@ -111,34 +111,26 @@ def parse_youtube_id(url: str) -> str | None:
     return YoutubeIE.get_temp_id(url)
 
 
-def base_options(cookies_file: str | None, cookies_from_browser: str | None) -> dict[str, Any]:
+def base_options(cookies_file: str | None = None) -> dict[str, Any]:
     options: dict[str, Any] = {"quiet": True, "no_warnings": True, "noprogress": True}
     if cookies_file and Path(cookies_file).is_file():
         options["cookiefile"] = cookies_file
-    elif cookies_from_browser:
-        options["cookiesfrombrowser"] = (cookies_from_browser,)
     return options
 
 
 class YtDlpDownloader:
-    def __init__(
-        self,
-        media_root: Path,
-        cookies_file: str | None = None,
-        cookies_from_browser: str | None = None,
-    ) -> None:
+    def __init__(self, media_root: Path) -> None:
         self.media_root = media_root
-        self.cookies_file = cookies_file
-        self.cookies_from_browser = cookies_from_browser
 
     def _options(
         self,
+        cookies_file: str | None = None,
         on_progress: Callable[[Progress], None] | None = None,
         max_height: int | None = None,
         should_cancel: Callable[[], bool] = _never,
     ) -> dict[str, Any]:
         options: dict[str, Any] = {
-            **base_options(self.cookies_file, self.cookies_from_browser),
+            **base_options(cookies_file),
             "noplaylist": True,
             "format": format_selector(max_height),
             "merge_output_format": "mp4",
@@ -170,9 +162,9 @@ class YtDlpDownloader:
             options["postprocessor_hooks"] = [postprocessor_hook]
         return options
 
-    def probe(self, url: str) -> Probe:
+    def probe(self, url: str, cookies_file: str | None = None) -> Probe:
         try:
-            with yt_dlp.YoutubeDL(self._options()) as ydl:
+            with yt_dlp.YoutubeDL(self._options(cookies_file)) as ydl:
                 info = ydl.extract_info(url, download=False, process=False)
         except yt_dlp.utils.YoutubeDLError as exc:
             raise DownloadError(clean_error(exc)) from exc
@@ -180,11 +172,9 @@ class YtDlpDownloader:
             raise DownloadError("Only single videos are supported, not playlists or channels")
         return Probe(youtube_id=info["id"], title=info.get("title"), info=info)
 
-    def formats(self, url: str) -> VideoFormats:
+    def formats(self, url: str, cookies_file: str | None = None) -> VideoFormats:
         try:
-            with yt_dlp.YoutubeDL(
-                {**base_options(self.cookies_file, self.cookies_from_browser), "noplaylist": True}
-            ) as ydl:
+            with yt_dlp.YoutubeDL({**base_options(cookies_file), "noplaylist": True}) as ydl:
                 info = ydl.extract_info(url, download=False)
         except yt_dlp.utils.YoutubeDLError as exc:
             raise DownloadError(clean_error(exc)) from exc
@@ -204,9 +194,11 @@ class YtDlpDownloader:
         on_progress: Callable[[Progress], None],
         max_height: int | None = None,
         should_cancel: Callable[[], bool] = _never,
+        cookies_file: str | None = None,
     ) -> DownloadResult:
+        options = self._options(cookies_file, on_progress, max_height, should_cancel)
         try:
-            with yt_dlp.YoutubeDL(self._options(on_progress, max_height, should_cancel)) as ydl:
+            with yt_dlp.YoutubeDL(options) as ydl:
                 info = ydl.process_ie_result(probe.info, download=True)
         except yt_dlp.utils.DownloadCancelled as exc:
             raise DownloadCancelled("Cancelled") from exc

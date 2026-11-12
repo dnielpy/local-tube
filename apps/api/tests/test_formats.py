@@ -78,7 +78,7 @@ class FakeFormats:
         self.error = error
         self.calls = 0
 
-    def formats(self, url: str) -> VideoFormats:
+    def formats(self, url: str, cookies_file=None) -> VideoFormats:
         self.calls += 1
         if self.error:
             raise DownloadError(self.error)

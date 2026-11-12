@@ -28,13 +28,19 @@ class FakeDownloader:
         self.fail_with = fail_with
         self.downloads = 0
 
-    def probe(self, url: str) -> Probe:
+    def probe(self, url: str, cookies_file=None) -> Probe:
+        self.cookies_file = cookies_file
         if self.fail_with:
             raise DownloadError(self.fail_with)
         return Probe(youtube_id="dQw4w9WgXcQ", title="Never Gonna Give You Up", info={})
 
     def download(
-        self, probe: Probe, on_progress, max_height=None, should_cancel=lambda: False
+        self,
+        probe: Probe,
+        on_progress,
+        max_height=None,
+        should_cancel=lambda: False,
+        cookies_file=None,
     ) -> DownloadResult:
         self.downloads += 1
         self.max_height = max_height
@@ -121,9 +127,13 @@ async def test_worker_downloads_and_creates_video(client, media_root):
     assert video["duration_seconds"] == 213
 
 
-async def test_worker_links_existing_video_without_downloading(client, make_video, media_root):
+async def test_worker_links_existing_video_without_downloading(
+    client, make_video, media_root, profile
+):
     async with SessionLocal() as session:
-        job = DownloadJob(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=abc")
+        job = DownloadJob(
+            url="https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=abc", profile_id=profile.id
+        )
         session.add(job)
         await session.commit()
     video = await make_video("dQw4w9WgXcQ")
@@ -163,9 +173,9 @@ async def test_delete_download(client):
     assert (await client.get("/api/downloads")).json() == []
 
 
-async def test_interrupted_jobs_are_requeued(client):
+async def test_interrupted_jobs_are_requeued(client, profile):
     async with SessionLocal() as session:
-        job = DownloadJob(url=URL, status=JobStatus.downloading, progress=40)
+        job = DownloadJob(url=URL, status=JobStatus.downloading, progress=40, profile_id=profile.id)
         session.add(job)
         await session.commit()
 
@@ -229,12 +239,12 @@ async def test_worker_caches_the_channel_before_completing(client, media_root):
 
 async def test_worker_caches_thumbnail_duration_and_size(client, media_root, fetch):
     class SizedDownloader(FakeDownloader):
-        def probe(self, url: str) -> Probe:
+        def probe(self, url: str, cookies_file=None) -> Probe:
             probe = super().probe(url)
             probe.info["duration"] = 213
             return probe
 
-        def download(self, probe, on_progress, max_height=None, should_cancel=lambda: False):
+        def download(self, probe, on_progress, max_height=None, should_cancel=lambda: False, *_):
             on_progress(Progress("downloading", percent=10, total_bytes=12_600_000))
             return super().download(probe, on_progress, max_height)
 
@@ -255,7 +265,7 @@ class SlowDownloader(FakeDownloader):
         super().__init__(media_root)
         self.started = threading.Event()
 
-    def download(self, probe, on_progress, max_height=None, should_cancel=lambda: False):
+    def download(self, probe, on_progress, max_height=None, should_cancel=lambda: False, *_):
         directory = self.media_root / probe.youtube_id
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "video.mp4.part").write_bytes(b"partial")

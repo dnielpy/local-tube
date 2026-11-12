@@ -58,15 +58,9 @@ def _thumbnail(thumbnails: list[dict[str, Any]] | None, thumbnail_id: str) -> st
 
 
 class YtDlpYouTubeClient:
-    def __init__(self, cookies_file: str | None = None, cookies_from_browser: str | None = None):
-        self.cookies_file = cookies_file
-        self.cookies_from_browser = cookies_from_browser
-
-    def _extract(self, url: str, **options: Any) -> dict[str, Any]:
+    def _extract(self, url: str, cookies_file: str | None = None, **options: Any) -> dict[str, Any]:
         try:
-            with yt_dlp.YoutubeDL(
-                {**base_options(self.cookies_file, self.cookies_from_browser), **options}
-            ) as ydl:
+            with yt_dlp.YoutubeDL({**base_options(cookies_file), **options}) as ydl:
                 info = ydl.extract_info(url, download=False)
         except yt_dlp.utils.YoutubeDLError as exc:
             raise YouTubeError(clean_error(exc)) from exc
@@ -74,8 +68,10 @@ class YtDlpYouTubeClient:
             raise YouTubeError(f"No data for {url}")
         return info
 
-    def subscriptions(self) -> list[RemoteChannel]:
-        info = self._extract("https://www.youtube.com/feed/channels", extract_flat=True)
+    def subscriptions(self, cookies_file: str | None = None) -> list[RemoteChannel]:
+        info = self._extract(
+            "https://www.youtube.com/feed/channels", cookies_file, extract_flat=True
+        )
         channels = []
         for entry in info.get("entries") or []:
             channel_id = entry.get("channel_id") or entry.get("id")

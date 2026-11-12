@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from app.db import SessionDep
 from app.media import media_path
-from app.models import Channel, ChannelVideo, Video
+from app.models import Channel, ChannelVideo, Profile, ProfileSubscription, ProfileVideo, Video
 from app.schemas import (
     ChannelDetail,
     ChannelList,
@@ -18,6 +18,7 @@ from app.schemas import (
 )
 from app.services.channels import PAGE_SIZE, ChannelService
 from app.services.connectivity import connectivity
+from app.services.library import in_library
 from app.services.profiles import ProfileDep
 from app.services.youtube import YouTubeError
 
@@ -37,18 +38,27 @@ def _avatar_url(channel: Channel | None) -> str | None:
     return channel.avatar_url if channel else None
 
 
-async def _downloaded_channels(session: SessionDep) -> list[ChannelOut]:
+async def _subscribed_ids(session: SessionDep, profile: Profile) -> set[str]:
+    rows = await session.scalars(
+        select(ProfileSubscription.channel_id).where(ProfileSubscription.profile_id == profile.id)
+    )
+    return set(rows)
+
+
+async def _downloaded_channels(session: SessionDep, profile: Profile) -> list[ChannelOut]:
     rows = await session.execute(
         select(
             Video.channel_id,
             func.max(Video.channel),
             func.count(),
-            func.max(Video.created_at),
+            func.max(ProfileVideo.created_at),
         )
-        .where(Video.channel.is_not(None))
+        .join(ProfileVideo, ProfileVideo.video_id == Video.id)
+        .where(ProfileVideo.profile_id == profile.id, Video.channel.is_not(None))
         .group_by(Video.channel_id, Video.channel)
-        .order_by(func.max(Video.created_at).desc())
+        .order_by(func.max(ProfileVideo.created_at).desc())
     )
+    subscribed = await _subscribed_ids(session, profile)
     result = []
     for channel_id, name, count, _ in rows:
         channel = await session.get(Channel, channel_id) if channel_id else None
@@ -57,7 +67,7 @@ async def _downloaded_channels(session: SessionDep) -> list[ChannelOut]:
                 id=channel_id,
                 name=channel.name if channel else name,
                 handle=channel.handle if channel else None,
-                subscribed=channel.subscribed if channel else False,
+                subscribed=channel_id in subscribed,
                 downloaded_count=count,
                 avatar_url=_avatar_url(channel),
             )
@@ -65,20 +75,21 @@ async def _downloaded_channels(session: SessionDep) -> list[ChannelOut]:
     return result
 
 
-async def _subscribed_channels(session: SessionDep) -> list[ChannelOut]:
+async def _subscribed_channels(session: SessionDep, profile: Profile) -> list[ChannelOut]:
     counts = dict(
         (
             await session.execute(
                 select(Video.channel_id, func.count())
-                .where(Video.channel_id.is_not(None))
+                .where(Video.channel_id.is_not(None), in_library(profile.id))
                 .group_by(Video.channel_id)
             )
         ).all()
     )
     channels = await session.scalars(
         select(Channel)
-        .where(Channel.subscribed.is_(True))
-        .order_by(Channel.subscription_rank, func.lower(Channel.name))
+        .join(ProfileSubscription, ProfileSubscription.channel_id == Channel.id)
+        .where(ProfileSubscription.profile_id == profile.id)
+        .order_by(ProfileSubscription.rank, func.lower(Channel.name))
     )
     return [
         ChannelOut(
@@ -93,36 +104,41 @@ async def _subscribed_channels(session: SessionDep) -> list[ChannelOut]:
     ]
 
 
-async def _channel_list(session: SessionDep, syncing: bool) -> ChannelList:
-    subscribed = await _subscribed_channels(session)
+async def _channel_list(session: SessionDep, profile: Profile, syncing: bool) -> ChannelList:
+    subscribed = await _subscribed_channels(session, profile)
     if subscribed:
         return ChannelList(syncing=syncing, items=subscribed)
-    return ChannelList(syncing=syncing, items=await _downloaded_channels(session))
+    return ChannelList(syncing=syncing, items=await _downloaded_channels(session, profile))
 
 
 @router.get("/channels", response_model=ChannelList)
-async def list_channels(session: SessionDep, service: ServiceDep, _: ProfileDep) -> ChannelList:
-    syncing = await service.schedule_subscriptions()
-    return await _channel_list(session, syncing)
+async def list_channels(
+    session: SessionDep, service: ServiceDep, profile: ProfileDep
+) -> ChannelList:
+    syncing = await service.schedule_subscriptions(profile.id)
+    return await _channel_list(session, profile, syncing)
 
 
 @router.post("/channels/sync", response_model=ChannelList)
-async def sync_channels(session: SessionDep, service: ServiceDep, _: ProfileDep) -> ChannelList:
+async def sync_channels(
+    session: SessionDep, service: ServiceDep, profile: ProfileDep
+) -> ChannelList:
     if not connectivity.online:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, {"message": "Sin conexión"})
-    syncing = await service.schedule_subscriptions(force=True)
-    return await _channel_list(session, syncing)
+    syncing = await service.schedule_subscriptions(profile.id, force=True)
+    return await _channel_list(session, profile, syncing)
 
 
 async def _remote_videos(
-    session: SessionDep, videos: Iterable[ChannelVideo]
+    session: SessionDep, profile: Profile, videos: Iterable[ChannelVideo]
 ) -> list[RemoteVideoOut]:
     remote = list(videos)
     local = dict(
         (
             await session.execute(
                 select(Video.youtube_id, Video.id).where(
-                    Video.youtube_id.in_([video.youtube_id for video in remote])
+                    Video.youtube_id.in_([video.youtube_id for video in remote]),
+                    in_library(profile.id),
                 )
             )
         ).all()
@@ -151,7 +167,7 @@ async def get_channel(
     channel_id: str,
     session: SessionDep,
     service: ServiceDep,
-    _: ProfileDep,
+    profile: ProfileDep,
     refresh: bool = False,
 ) -> ChannelDetail:
     if refresh and not connectivity.online:
@@ -161,7 +177,10 @@ async def get_channel(
     channel = await session.get(Channel, channel_id, populate_existing=True)
     downloaded = list(
         await session.scalars(
-            select(Video).where(Video.channel_id == channel_id).order_by(Video.created_at.desc())
+            select(Video)
+            .join(ProfileVideo, ProfileVideo.video_id == Video.id)
+            .where(Video.channel_id == channel_id, ProfileVideo.profile_id == profile.id)
+            .order_by(ProfileVideo.created_at.desc())
         )
     )
     if channel is None and not downloaded and not refreshing:
@@ -171,6 +190,7 @@ async def get_channel(
     if connectivity.online and channel is not None:
         latest = await _remote_videos(
             session,
+            profile,
             await session.scalars(
                 select(ChannelVideo)
                 .where(ChannelVideo.channel_id == channel_id)
@@ -190,7 +210,7 @@ async def get_channel(
         handle=channel.handle if channel else None,
         description=channel.description if channel else None,
         subscriber_count=channel.subscriber_count if channel else None,
-        subscribed=channel.subscribed if channel else False,
+        subscribed=channel_id in await _subscribed_ids(session, profile),
         avatar_url=_avatar_url(channel),
         banner_url=(
             f"/api/channels/{channel_id}/banner?v={channel.banner_path.rsplit('-', 1)[-1]}"
@@ -210,7 +230,7 @@ async def channel_videos(
     channel_id: str,
     session: SessionDep,
     service: ServiceDep,
-    _: ProfileDep,
+    profile: ProfileDep,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> RemoteVideoPage:
     if not connectivity.online:
@@ -223,6 +243,7 @@ async def channel_videos(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, {"message": str(exc)}) from exc
     items = await _remote_videos(
         session,
+        profile,
         await session.scalars(
             select(ChannelVideo)
             .where(ChannelVideo.channel_id == channel_id, ChannelVideo.position >= offset)
