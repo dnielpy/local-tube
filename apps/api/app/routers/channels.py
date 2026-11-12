@@ -86,10 +86,9 @@ async def _subscribed_channels(session: SessionDep) -> list[ChannelOut]:
 
 
 async def _channel_list(session: SessionDep, syncing: bool) -> ChannelList:
-    if connectivity.online:
-        subscribed = await _subscribed_channels(session)
-        if subscribed:
-            return ChannelList(syncing=syncing, items=subscribed)
+    subscribed = await _subscribed_channels(session)
+    if subscribed:
+        return ChannelList(syncing=syncing, items=subscribed)
     return ChannelList(syncing=syncing, items=await _downloaded_channels(session))
 
 

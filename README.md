@@ -46,7 +46,9 @@ docker compose build --no-cache api && docker compose up -d api
 The api checks every minute whether it can reach YouTube (`GET https://www.youtube.com/generate_204`, an empty response). The sidebar shows the result. Its "Modo sin conexión" switch forces offline mode even when the network works, so LocalTube does not spend any data.
 
 - **Online:** the sidebar lists your real YouTube subscriptions in YouTube's order. This needs the cookies described above. A channel page shows the channel's banner, avatar, subscribers and description, its latest 10 videos (each can be opened on YouTube or downloaded), and the videos you have downloaded from it.
-- **Offline:** the sidebar lists the channels you have downloaded videos from. Channel pages still show the cached banner and avatar together with the downloaded videos. Queued downloads wait and start on their own when the connection comes back.
+- **Offline:** the sidebar stays exactly the same, built from the cached subscriptions. The only difference is inside a channel: instead of its latest 10 videos, the page shows the videos you have downloaded from it, with the cached banner and avatar. Queued downloads wait and start on their own when the connection comes back.
+
+Until the subscriptions have been synced once, the sidebar lists the channels you have downloaded videos from.
 
 Everything that comes from YouTube is cached so it is fetched as rarely as possible:
 

@@ -63,6 +63,17 @@ async def test_offline_lists_channels_with_downloaded_videos(client, youtube, ma
     }
 
 
+async def test_offline_keeps_the_cached_subscriptions(client, youtube, channel_service):
+    _, online = await get_channels(client, channel_service)
+    connectivity.forced_offline = True
+
+    offline = (await client.get("/api/channels")).json()
+
+    assert youtube.calls == ["subscriptions"]
+    assert offline["syncing"] is False
+    assert offline["items"] == online["items"]
+
+
 async def test_sync_requires_connection(client):
     connectivity.reachable = False
     response = await client.post("/api/channels/sync")

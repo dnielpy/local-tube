@@ -96,7 +96,6 @@ function GuideStatus() {
 function GuideChannels() {
   use(browser("Channels are fetched from the api in the browser."));
   const [expanded, setExpanded] = useState(false);
-  const online = useOnline();
   const channels = useQuery({
     queryKey: queryKeys.channels,
     queryFn: api.channels,
@@ -105,7 +104,7 @@ function GuideChannels() {
   const items = channels.data?.items ?? [];
   if (items.length === 0) return null;
   const visible = expanded ? items : items.slice(0, VISIBLE_CHANNELS);
-  const subscriptions = online && items.some((channel) => channel.subscribed);
+  const subscriptions = items.some((channel) => channel.subscribed);
 
   return (
     <section className="border-b border-yt-divider px-3 py-3">
