@@ -41,6 +41,23 @@ YouTube changes often, and yt-dlp has to keep up. When downloads start failing, 
 docker compose build --no-cache api && docker compose up -d api
 ```
 
+## Online and offline
+
+The api checks every minute whether it can reach YouTube (`GET https://www.youtube.com/generate_204`, an empty response). The sidebar shows the result. Its "Modo sin conexión" switch forces offline mode even when the network works, so LocalTube does not spend any data.
+
+- **Online:** the sidebar lists your real YouTube subscriptions in YouTube's order. This needs the cookies described above. A channel page shows the channel's banner, avatar, subscribers and description, its latest 10 videos (each can be opened on YouTube or downloaded), and the videos you have downloaded from it.
+- **Offline:** the sidebar lists the channels you have downloaded videos from. Channel pages still show the cached banner and avatar together with the downloaded videos. Queued downloads wait and start on their own when the connection comes back.
+
+Everything that comes from YouTube is cached so it is fetched as rarely as possible:
+
+| What | Where | Refreshed |
+| --- | --- | --- |
+| Subscriptions | `channels` table | Every 24 h, or with ↻ |
+| A channel's latest 10 videos and its info | `channels`, `channel_videos` | When the page is opened and the cache is older than 6 h, or with "Actualizar" |
+| Avatars (176 px), banners (1280 px wide) and thumbnails (320×180) | `MEDIA_PATH/.cache/` | Only when YouTube changes the image |
+
+Channel data comes from yt-dlp in flat mode: one request for all subscriptions and one per channel page, with no extra request per video. The browser never talks to YouTube directly. Every image is served by the api from its cache.
+
 ## Development
 
 Requirements: Node 24, pnpm, [uv](https://docs.astral.sh/uv/) and Docker. To download videos outside Docker you also need `ffmpeg` and `deno` on your `PATH`.
