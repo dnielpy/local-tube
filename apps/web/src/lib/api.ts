@@ -47,8 +47,11 @@ export const api = {
   video: (id: string) => request<Video>(`/videos/${id}`),
   deleteVideo: (id: string) => request<void>(`/videos/${id}`, { method: "DELETE" }),
   downloads: () => request<DownloadJob[]>("/downloads"),
-  createDownload: (url: string) =>
-    request<DownloadJob>("/downloads", { method: "POST", body: JSON.stringify({ url }) }),
+  createDownload: ({ url, maxHeight }: { url: string; maxHeight: number | null }) =>
+    request<DownloadJob>("/downloads", {
+      method: "POST",
+      body: JSON.stringify({ url, max_height: maxHeight }),
+    }),
   retryDownload: (id: string) => request<DownloadJob>(`/downloads/${id}/retry`, { method: "POST" }),
   deleteDownload: (id: string) => request<void>(`/downloads/${id}`, { method: "DELETE" }),
 };

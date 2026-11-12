@@ -15,7 +15,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings.media_root.mkdir(parents=True, exist_ok=True)
     worker = None
     if settings.worker_enabled:
-        worker = DownloadWorker(YtDlpDownloader(settings.media_root), settings.download_concurrency)
+        downloader = YtDlpDownloader(
+            settings.media_root, settings.cookies_file, settings.cookies_from_browser
+        )
+        worker = DownloadWorker(downloader, settings.download_concurrency)
         await worker.start()
     app.state.worker = worker
     yield

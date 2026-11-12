@@ -22,7 +22,9 @@ IDLE_POLL_INTERVAL = 5.0
 class Downloader(Protocol):
     def probe(self, url: str) -> Probe: ...
 
-    def download(self, probe: Probe, on_progress: "ProgressCallback") -> DownloadResult: ...
+    def download(
+        self, probe: Probe, on_progress: "ProgressCallback", max_height: int | None = None
+    ) -> DownloadResult: ...
 
 
 class ProgressCallback(Protocol):
@@ -68,9 +70,9 @@ class DownloadWorker:
         claimed = await claim_next_job()
         if claimed is None:
             return False
-        job_id, url = claimed
+        job_id, url, max_height = claimed
         try:
-            await self._process(job_id, url)
+            await self._process(job_id, url, max_height)
         except DownloadError as exc:
             await _update_job(job_id, status=JobStatus.failed, error=str(exc), speed=None, eta=None)
         except Exception as exc:
@@ -78,7 +80,7 @@ class DownloadWorker:
             await _update_job(job_id, status=JobStatus.failed, error=str(exc), speed=None, eta=None)
         return True
 
-    async def _process(self, job_id: uuid.UUID, url: str) -> None:
+    async def _process(self, job_id: uuid.UUID, url: str, max_height: int | None) -> None:
         probe = await asyncio.to_thread(self.downloader.probe, url)
         await _update_job(job_id, title=probe.title)
 
@@ -91,7 +93,7 @@ class DownloadWorker:
 
         latest: list[Progress] = []
         download = asyncio.create_task(
-            asyncio.to_thread(self.downloader.download, probe, latest.append)
+            asyncio.to_thread(self.downloader.download, probe, latest.append, max_height)
         )
         while not download.done():
             await asyncio.wait({download}, timeout=FLUSH_INTERVAL)
@@ -115,7 +117,7 @@ class DownloadWorker:
             await session.commit()
 
 
-async def claim_next_job() -> tuple[uuid.UUID, str] | None:
+async def claim_next_job() -> tuple[uuid.UUID, str, int | None] | None:
     async with SessionLocal() as session, session.begin():
         job = await session.scalar(
             select(DownloadJob)
@@ -129,7 +131,7 @@ async def claim_next_job() -> tuple[uuid.UUID, str] | None:
         job.status = JobStatus.downloading
         job.progress = 0
         job.error = None
-        return job.id, job.url
+        return job.id, job.url, job.max_height
 
 
 async def requeue_interrupted_jobs() -> None:

@@ -70,9 +70,18 @@ export function Downloads() {
   );
 }
 
+const QUALITIES: { label: string; value: number | null }[] = [
+  { label: "360p", value: 360 },
+  { label: "480p", value: 480 },
+  { label: "720p", value: 720 },
+  { label: "1080p", value: 1080 },
+  { label: "Máxima", value: null },
+];
+
 function DownloadForm() {
   const client = useQueryClient();
   const [url, setUrl] = useState("");
+  const [maxHeight, setMaxHeight] = useState<number | null>(360);
   const create = useMutation({
     mutationFn: api.createDownload,
     onSuccess: () => {
@@ -83,7 +92,7 @@ function DownloadForm() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (url.trim()) create.mutate(url.trim());
+    if (url.trim()) create.mutate({ url: url.trim(), maxHeight });
   }
 
   const error = create.error;
@@ -111,7 +120,7 @@ function DownloadForm() {
               if (pasted && !url) {
                 event.preventDefault();
                 setUrl(pasted);
-                create.mutate(pasted);
+                create.mutate({ url: pasted, maxHeight });
               }
             }}
             type="url"
@@ -132,6 +141,20 @@ function DownloadForm() {
             </button>
           )}
         </div>
+        <select
+          value={maxHeight ?? "best"}
+          onChange={(event) =>
+            setMaxHeight(event.target.value === "best" ? null : Number(event.target.value))
+          }
+          aria-label="Calidad"
+          className="h-10 cursor-pointer rounded-full bg-yt-surface px-4 text-sm font-medium outline-none hover:bg-yt-surface-hover [&>option]:bg-yt-menu"
+        >
+          {QUALITIES.map((quality) => (
+            <option key={quality.label} value={quality.value ?? "best"}>
+              {quality.label}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           disabled={!url.trim() || create.isPending}
@@ -201,7 +224,7 @@ function JobRow({ job }: { job: DownloadJob }) {
     </div>
   );
 
-  const details = [STATUS_LABEL[job.status]];
+  const details = [STATUS_LABEL[job.status], job.max_height ? `${job.max_height}p` : "Máxima"];
   if (job.status === "downloading") {
     details.push(`${Math.round(job.progress)}%`);
     if (job.speed) details.push(job.speed);
@@ -234,6 +257,12 @@ function JobRow({ job }: { job: DownloadJob }) {
         {job.error && (
           <p className="mt-1 line-clamp-3 text-xs leading-[18px] text-yt-text-secondary">
             {job.error}
+          </p>
+        )}
+        {job.error?.includes("cookies") && (
+          <p className="mt-1 text-xs leading-[18px] text-yt-text">
+            YouTube pide iniciar sesión. Configura las cookies del navegador en la API (README,
+            sección «Cookies de YouTube») y pulsa reintentar.
           </p>
         )}
         <p className="mt-1 text-xs leading-[18px] text-yt-text-secondary">

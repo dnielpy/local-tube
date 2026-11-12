@@ -2,7 +2,14 @@ import pytest
 
 from app.db import SessionLocal
 from app.models import DownloadJob, JobStatus
-from app.services.downloader import DownloadError, DownloadResult, Probe, Progress
+from app.services.downloader import (
+    DownloadError,
+    DownloadResult,
+    Probe,
+    Progress,
+    _clean_error,
+    format_selector,
+)
 from app.services.worker import DownloadWorker, format_eta, format_speed, requeue_interrupted_jobs
 
 URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -19,8 +26,9 @@ class FakeDownloader:
             raise DownloadError(self.fail_with)
         return Probe(youtube_id="dQw4w9WgXcQ", title="Never Gonna Give You Up", info={})
 
-    def download(self, probe: Probe, on_progress) -> DownloadResult:
+    def download(self, probe: Probe, on_progress, max_height=None) -> DownloadResult:
         self.downloads += 1
+        self.max_height = max_height
         on_progress(Progress("downloading", percent=50, speed=2 * 1024 * 1024, eta=30))
         directory = self.media_root / probe.youtube_id
         directory.mkdir(parents=True, exist_ok=True)
@@ -44,6 +52,21 @@ async def test_create_download_queues_job(client):
     assert response.status_code == 201
     assert response.json()["status"] == "queued"
     assert len((await client.get("/api/downloads")).json()) == 1
+
+
+async def test_create_download_defaults_to_360p(client):
+    default = (await client.post("/api/downloads", json={"url": URL})).json()
+    best = (
+        await client.post("/api/downloads", json={"url": URL + "&x=1", "max_height": None})
+    ).json()
+
+    assert default["max_height"] == 360
+    assert best["max_height"] is None
+
+
+async def test_create_download_rejects_unknown_quality(client):
+    response = await client.post("/api/downloads", json={"url": URL, "max_height": 361})
+    assert response.status_code == 422
 
 
 async def test_create_download_rejects_non_urls(client):
@@ -71,10 +94,12 @@ async def test_create_download_rejects_duplicate_active_job(client):
 
 
 async def test_worker_downloads_and_creates_video(client, media_root):
-    job = (await client.post("/api/downloads", json={"url": URL})).json()
-    worker = DownloadWorker(FakeDownloader(media_root))
+    job = (await client.post("/api/downloads", json={"url": URL, "max_height": 720})).json()
+    downloader = FakeDownloader(media_root)
+    worker = DownloadWorker(downloader)
 
     assert await worker.run_once() is True
+    assert downloader.max_height == 720
     assert await worker.run_once() is False
 
     done = (await client.get(f"/api/downloads/{job['id']}")).json()
@@ -152,3 +177,13 @@ def test_format_speed(speed, expected):
 @pytest.mark.parametrize(("eta", "expected"), [(None, None), (65, "1:05"), (3725, "1:02:05")])
 def test_format_eta(eta, expected):
     assert format_eta(eta) == expected
+
+
+def test_format_selector_caps_height():
+    assert format_selector(360).startswith("bv*[height<=360][ext=mp4][vcodec^=avc]")
+    assert format_selector(None).startswith("bv*[ext=mp4]")
+
+
+def test_clean_error_strips_colors():
+    error = Exception("\x1b[0;31mERROR:\x1b[0m [youtube] abc: Sign in to confirm")
+    assert _clean_error(error) == "[youtube] abc: Sign in to confirm"

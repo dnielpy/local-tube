@@ -1,5 +1,6 @@
 """Thin wrapper around yt-dlp. Everything here is blocking and runs in a worker thread."""
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,8 +9,14 @@ from typing import Any
 import yt_dlp
 from yt_dlp.extractor.youtube import YoutubeIE
 
-# Prefer H.264 + AAC in an mp4 so every browser can play the file without transcoding.
-FORMAT = "bv*[ext=mp4][vcodec^=avc]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b"
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def format_selector(max_height: int | None) -> str:
+    """Prefer H.264 + AAC in an mp4 so every browser plays the file without transcoding,
+    capped at max_height, falling back to whatever exists when that is not available."""
+    cap = f"[height<={max_height}]" if max_height else ""
+    return f"bv*{cap}[ext=mp4][vcodec^=avc]+ba[ext=m4a]/b{cap}[ext=mp4]/bv*{cap}+ba/b{cap}/b"
 
 
 @dataclass
@@ -52,16 +59,27 @@ def parse_youtube_id(url: str) -> str | None:
 
 
 class YtDlpDownloader:
-    def __init__(self, media_root: Path) -> None:
+    def __init__(
+        self,
+        media_root: Path,
+        cookies_file: str | None = None,
+        cookies_from_browser: str | None = None,
+    ) -> None:
         self.media_root = media_root
+        self.cookies_file = cookies_file
+        self.cookies_from_browser = cookies_from_browser
 
-    def _options(self, on_progress: Callable[[Progress], None] | None = None) -> dict[str, Any]:
+    def _options(
+        self,
+        on_progress: Callable[[Progress], None] | None = None,
+        max_height: int | None = None,
+    ) -> dict[str, Any]:
         options: dict[str, Any] = {
             "quiet": True,
             "no_warnings": True,
             "noprogress": True,
             "noplaylist": True,
-            "format": FORMAT,
+            "format": format_selector(max_height),
             "merge_output_format": "mp4",
             "paths": {"home": str(self.media_root)},
             "outtmpl": {
@@ -73,6 +91,10 @@ class YtDlpDownloader:
                 {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"}
             ],
         }
+        if self.cookies_file:
+            options["cookiefile"] = self.cookies_file
+        elif self.cookies_from_browser:
+            options["cookiesfrombrowser"] = (self.cookies_from_browser,)
         if on_progress is not None:
             options["progress_hooks"] = [_progress_hook(on_progress)]
             options["postprocessor_hooks"] = [
@@ -90,9 +112,14 @@ class YtDlpDownloader:
             raise DownloadError("Only single videos are supported, not playlists or channels")
         return Probe(youtube_id=info["id"], title=info.get("title"), info=info)
 
-    def download(self, probe: Probe, on_progress: Callable[[Progress], None]) -> DownloadResult:
+    def download(
+        self,
+        probe: Probe,
+        on_progress: Callable[[Progress], None],
+        max_height: int | None = None,
+    ) -> DownloadResult:
         try:
-            with yt_dlp.YoutubeDL(self._options(on_progress)) as ydl:
+            with yt_dlp.YoutubeDL(self._options(on_progress, max_height)) as ydl:
                 info = ydl.process_ie_result(probe.info, download=True)
         except yt_dlp.utils.YoutubeDLError as exc:
             raise DownloadError(_clean_error(exc)) from exc
@@ -145,4 +172,4 @@ def _progress_hook(on_progress: Callable[[Progress], None]) -> Callable[[dict[st
 
 
 def _clean_error(exc: Exception) -> str:
-    return str(exc).removeprefix("ERROR: ").strip()
+    return ANSI_ESCAPE.sub("", str(exc)).strip().removeprefix("ERROR:").strip()

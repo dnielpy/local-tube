@@ -168,6 +168,8 @@ export interface components {
         DownloadCreate: {
             /** Url */
             url: string;
+            /** Max Height */
+            max_height?: number | null;
         };
         /** DownloadJobOut */
         DownloadJobOut: {
@@ -189,6 +191,8 @@ export interface components {
             error: string | null;
             /** Title */
             title: string | null;
+            /** Max Height */
+            max_height: number | null;
             /** Video Id */
             video_id: string | null;
             /**

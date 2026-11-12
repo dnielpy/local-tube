@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 
+from app.config import get_settings
 from app.db import SessionDep
 from app.models import DownloadJob, JobStatus, Video
 from app.schemas import DownloadCreate, DownloadJobOut
@@ -53,7 +54,12 @@ async def create_download(
             {"message": "This video is already being downloaded", "job_id": str(active.id)},
         )
 
-    job = DownloadJob(url=url)
+    max_height = (
+        body.max_height
+        if "max_height" in body.model_fields_set
+        else get_settings().default_max_height
+    )
+    job = DownloadJob(url=url, max_height=max_height)
     session.add(job)
     await session.commit()
     await session.refresh(job)

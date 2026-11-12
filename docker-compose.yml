@@ -21,8 +21,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-localtube}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-localtube}
       MEDIA_ROOT: /media
       DOWNLOAD_CONCURRENCY: ${DOWNLOAD_CONCURRENCY:-1}
+      DEFAULT_MAX_HEIGHT: ${DEFAULT_MAX_HEIGHT:-360}
+      COOKIES_FILE: ${COOKIES_FILE:-}
     volumes:
       - ${MEDIA_PATH:?set MEDIA_PATH in .env}:/media
+      # Holds cookies.txt; writable because yt-dlp saves refreshed cookies back to it.
+      - ./config:/config
     depends_on:
       postgres:
         condition: service_healthy

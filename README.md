@@ -21,6 +21,19 @@ LocalTube is now at `http://<server-ip>` (or the `PORT` you chose). Caddy is the
 
 Videos are saved under `MEDIA_PATH/<youtube id>/video.mp4`, next to their `thumbnail.jpg`. The database stores the paths relative to that folder, so the drive can be mounted somewhere else later.
 
+Videos download at 360p by default. The downloads page has a quality selector (360p, 480p, 720p, 1080p or the best available), and `DEFAULT_MAX_HEIGHT` changes the default for requests that do not say.
+
+### YouTube cookies
+
+From some networks YouTube refuses to serve videos without a signed-in session ("Sign in to confirm you're not a bot"). yt-dlp can reuse the cookies of a browser where you are logged in to YouTube:
+
+1. In a private/incognito window, log in to YouTube, open `https://www.youtube.com/robots.txt` in that same tab, and export the cookies for youtube.com in Netscape format, for example with the "Get cookies.txt LOCALLY" extension. Then close the private window without logging out, so YouTube does not rotate those cookies.
+2. Save the file on the server as `config/cookies.txt`, next to `docker-compose.yml`.
+3. Add `COOKIES_FILE=/config/cookies.txt` to `.env` and run `docker compose up -d api`.
+4. Retry the failed download from the downloads page.
+
+When the cookies expire, export them again the same way.
+
 YouTube changes often, and yt-dlp has to keep up. When downloads start failing, rebuild the api image to pull the latest yt-dlp:
 
 ```bash
@@ -40,6 +53,8 @@ pnpm dev                                          # api on :8000, web on :3000
 ```
 
 In development, `next dev` forwards `/api` to `http://localhost:8000`. Set `API_URL` to point it somewhere else.
+
+Copy `apps/api/.env.example` to `apps/api/.env`. It sets `COOKIES_FROM_BROWSER=chrome`, so the api reads YouTube cookies straight from your Chrome profile. On macOS the first download asks for Keychain access to "Chrome Safe Storage": allow it.
 
 | Command | What it does |
 | --- | --- |
