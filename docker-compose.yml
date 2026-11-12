@@ -26,11 +26,11 @@ services:
       MEDIA_ROOT: /media
       DOWNLOAD_CONCURRENCY: ${DOWNLOAD_CONCURRENCY:-1}
       DEFAULT_MAX_HEIGHT: ${DEFAULT_MAX_HEIGHT:-360}
-      COOKIES_FILE: ${COOKIES_FILE:-}
+      COOKIES_FILE: /config/cookies.txt
     volumes:
       - ${MEDIA_PATH:?set MEDIA_PATH in .env}:/media
-      # Holds cookies.txt; writable because yt-dlp saves refreshed cookies back to it.
-      - ./config:/config
+      # Writable because yt-dlp saves the refreshed cookies back to the file.
+      - ${COOKIES_PATH:-./config/cookies.txt}:/config/cookies.txt
     depends_on:
       postgres:
         condition: service_healthy

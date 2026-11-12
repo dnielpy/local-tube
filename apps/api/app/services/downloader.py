@@ -91,7 +91,8 @@ class YtDlpDownloader:
                 {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"}
             ],
         }
-        if self.cookies_file:
+        # A bind mount of a missing host file shows up as a directory, so check for a file.
+        if self.cookies_file and Path(self.cookies_file).is_file():
             options["cookiefile"] = self.cookies_file
         elif self.cookies_from_browser:
             options["cookiesfrombrowser"] = (self.cookies_from_browser,)

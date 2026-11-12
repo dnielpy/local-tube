@@ -13,7 +13,8 @@ Requirements: Docker with the Compose plugin.
 
 ```bash
 cp .env.example .env
-# Edit .env: set POSTGRES_PASSWORD and MEDIA_PATH (the folder on the hard drive).
+# Edit .env: POSTGRES_PASSWORD, MEDIA_PATH (folder on the external drive)
+# and COOKIES_PATH (your cookies.txt, see below).
 docker compose up -d --build
 ```
 
@@ -28,8 +29,8 @@ Videos download at 360p by default. The downloads page has a quality selector (3
 From some networks YouTube refuses to serve videos without a signed-in session ("Sign in to confirm you're not a bot"). yt-dlp can reuse the cookies of a browser where you are logged in to YouTube:
 
 1. In a private/incognito window, log in to YouTube, open `https://www.youtube.com/robots.txt` in that same tab, and export the cookies for youtube.com in Netscape format, for example with the "Get cookies.txt LOCALLY" extension. Then close the private window without logging out, so YouTube does not rotate those cookies.
-2. Save the file on the server as `config/cookies.txt`, next to `docker-compose.yml`.
-3. Add `COOKIES_FILE=/config/cookies.txt` to `.env` and run `docker compose up -d api`.
+2. Copy the file to the server and set `COOKIES_PATH` in `.env` to its full path. If you leave it out, the stack uses `config/cookies.txt` next to `docker-compose.yml`.
+3. Run `docker compose up -d api`.
 4. Retry the failed download from the downloads page.
 
 When the cookies expire, export them again the same way.
