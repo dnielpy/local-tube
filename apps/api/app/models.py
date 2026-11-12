@@ -80,20 +80,12 @@ class ChannelVideo(Base):
     position: Mapped[int] = mapped_column(Integer)
 
 
-class ProfileStatus(enum.StrEnum):
-    pending = "pending"
-    ready = "ready"
-
-
 class Profile(Base):
     __tablename__ = "profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text)
     pin_hash: Mapped[str] = mapped_column(Text)
-    status: Mapped[ProfileStatus] = mapped_column(
-        Enum(ProfileStatus, name="profile_status"), default=ProfileStatus.pending
-    )
     avatar_path: Mapped[str | None] = mapped_column(Text)
     youtube_name: Mapped[str | None] = mapped_column(Text)
     signed_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

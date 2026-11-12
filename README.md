@@ -4,7 +4,6 @@ A YouTube clone for the home network. Browse a library of videos stored on a loc
 
 - `apps/api`: FastAPI, PostgreSQL (SQLAlchemy 2 + Alembic) and yt-dlp. It serves the library, streams the videos with HTTP Range support, and runs a background download queue.
 - `apps/web`: Next.js with Tailwind, built to look like youtube.com: home grid, search results, watch page with a custom player, and a downloads page.
-- `apps/browser`: a Chromium you see inside LocalTube (KasmVNC), used only to sign profiles in to YouTube.
 
 The monorepo uses Turborepo with pnpm workspaces. The Python app is plugged into turbo through a small `package.json` that calls `uv`.
 
@@ -26,17 +25,14 @@ Before a download starts, LocalTube analyzes the video (`GET /api/downloads/form
 
 ### Profiles
 
-LocalTube opens on a "¿Quién está viendo?" screen, like Netflix. Every profile has its own library, downloads, YouTube subscriptions and watch progress, and opens with a 4-digit PIN. Five wrong PINs lock the profile for a minute. A video downloaded by two profiles is stored once on the drive, and deleting it from one library keeps the file for the other.
+LocalTube opens on a "¿Quién está viendo?" screen, like Netflix. Every profile has its own library, downloads, YouTube subscriptions and watch progress, and opens with a 4-digit PIN. Five wrong PINs lock the profile for a minute. A session lasts 30 days on each device. A video downloaded by two profiles is stored once on the drive, and deleting it from one library keeps the file for the other.
 
-Creating a profile needs a connection, because every profile signs in to YouTube:
+To create a profile, choose a name and a PIN, and then paste the YouTube cookies of your account (or choose the file):
 
-1. "Agregar perfil": choose a name and a PIN.
-2. A real Chromium opens inside the page. Sign in to your Google account there, as on any computer.
-3. As soon as YouTube's session cookies show up, LocalTube saves them for the profile, takes the account's photo as the profile photo, closes Chromium and syncs the subscriptions.
+1. In a private/incognito window, log in to YouTube, open `https://www.youtube.com/robots.txt` in that same tab, and export the cookies for youtube.com in Netscape format, for example with the "Get cookies.txt LOCALLY" extension.
+2. Close the private window without logging out, so YouTube does not rotate those cookies.
 
-The cookies are kept in the `localtube-config` volume (`/config/profiles/<id>/cookies.txt`) and yt-dlp uses them for that profile's downloads and subscriptions. yt-dlp also saves the cookies YouTube renews along the way. When they expire anyway ("Sign in to confirm you're not a bot"), use "Volver a iniciar sesión en YouTube" in the profile menu: Chromium reopens with the same profile, usually already signed in.
-
-The `browser` container stays up with an empty desktop (about 100 MB). Chromium only runs during a sign-in. Caddy serves it at `/browser/` only to the profile that is signing in at that moment.
+LocalTube checks that the cookies hold a signed-in YouTube session, saves them in the `localtube-config` volume (`/config/profiles/<id>/cookies.txt`), takes the account's photo as the profile photo and syncs the subscriptions. yt-dlp uses them for that profile's downloads and subscriptions, and saves the cookies YouTube renews along the way. When they expire ("Sign in to confirm you're not a bot"), export them again and use "Actualizar cookies de YouTube" in the profile menu.
 
 The first profile created takes over the videos and downloads that existed before profiles.
 
@@ -72,14 +68,14 @@ Requirements: Node 24, pnpm, [uv](https://docs.astral.sh/uv/) and Docker. To dow
 ```bash
 pnpm install
 (cd apps/api && uv sync)
-docker compose -f docker-compose.dev.yml up -d   # Postgres on :5442, browser on :3010 and :9000
+docker compose -f docker-compose.dev.yml up -d   # Postgres on localhost:5442
 (cd apps/api && uv run alembic upgrade head)
 pnpm dev                                          # api on :8000, web on :3000
 ```
 
 In development, `next dev` forwards `/api` to `http://localhost:8000`. Set `API_URL` to point it somewhere else.
 
-Copy `apps/api/.env.example` to `apps/api/.env`. `docker-compose.dev.yml` also starts the browser container: its desktop on `localhost:3010` (which `next dev` serves at `/browser/`) and its control api on `localhost:9000`. Profiles are kept in `./config/profiles`.
+Copy `apps/api/.env.example` to `apps/api/.env`. Profiles and their cookies are kept in `./config/profiles`.
 
 | Command | What it does |
 | --- | --- |
@@ -95,9 +91,9 @@ Copy `apps/api/.env.example` to `apps/api/.env`. `docker-compose.dev.yml` also s
 | Method | Path | |
 | --- | --- | --- |
 | GET | `/api/profiles` | Profiles for the picker |
-| POST | `/api/profiles` `{name, pin}` | Creates a profile and opens Chromium for its YouTube sign-in |
+| POST | `/api/profiles` `{name, pin, cookies}` | Creates a profile with its YouTube cookies and signs in |
 | POST | `/api/profiles/{id}/unlock` `{pin}` | Starts a session (HttpOnly cookie, 30 days) |
-| GET / POST / DELETE | `/api/profiles/{id}/youtube` | Polls, restarts or cancels the YouTube sign-in |
+| PUT | `/api/profiles/{id}/cookies` `{cookies}` | Replaces the profile's YouTube cookies |
 | DELETE | `/api/profiles/{id}` `{pin}` | Deletes a profile |
 | GET / DELETE | `/api/session` | The current profile / switch profile |
 | GET | `/api/videos?q=&channel=&limit=&offset=` | The profile's library, newest first |

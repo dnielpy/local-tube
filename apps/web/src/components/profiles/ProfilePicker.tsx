@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, ApiError, queryKeys, type Profile } from "@/lib/api";
-import { useOnline } from "@/lib/use-status";
 
 import { BackIcon, Logo, TrashIcon } from "../icons";
 import { CreateProfile } from "./CreateProfile";
@@ -35,7 +34,6 @@ function pinError(error: unknown): { message: string; retryAfter: number } {
 
 export function ProfilePicker() {
   const profiles = useQuery({ queryKey: queryKeys.profiles, queryFn: api.profiles });
-  const online = useOnline();
   const [selected, setSelected] = useState<{ profile: Profile; action: "unlock" | "delete" }>();
   const [managing, setManaging] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -97,26 +95,19 @@ export function ProfilePicker() {
               <li>
                 <button
                   type="button"
-                  disabled={!online}
                   onClick={() => setCreating(true)}
-                  title={online ? undefined : "Necesitas conexión para iniciar sesión en YouTube"}
-                  className="group flex w-[104px] flex-col items-center gap-3 disabled:opacity-40 mini:w-[150px]"
+                  className="group flex w-[104px] flex-col items-center gap-3 mini:w-[150px]"
                 >
-                  <span className="flex size-[104px] items-center justify-center rounded-md text-7xl font-light text-yt-text-secondary transition-colors group-enabled:group-hover:bg-yt-surface group-enabled:group-hover:text-yt-text mini:size-[150px]">
+                  <span className="flex size-[104px] items-center justify-center rounded-md text-7xl font-light text-yt-text-secondary transition-colors group-hover:bg-yt-surface group-hover:text-yt-text mini:size-[150px]">
                     +
                   </span>
-                  <span className="text-center text-base text-yt-text-secondary group-enabled:group-hover:text-yt-text">
+                  <span className="text-center text-base text-yt-text-secondary group-hover:text-yt-text">
                     Agregar perfil
                   </span>
                 </button>
               </li>
             )}
           </ul>
-        )}
-        {!online && !managing && (
-          <p className="mt-6 max-w-[420px] text-center text-sm text-yt-text-secondary">
-            Sin conexión no se pueden crear perfiles, porque cada perfil inicia sesión en YouTube.
-          </p>
         )}
         {items.length > 0 && (
           <button

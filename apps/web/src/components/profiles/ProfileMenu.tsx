@@ -1,22 +1,20 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { api, queryKeys, type Profile } from "@/lib/api";
-import { useOnline } from "@/lib/use-status";
 
 import { RetryIcon } from "../icons";
+import { cookiesError } from "./CreateProfile";
+import { CookiesField } from "./CookiesField";
 import { ProfileAvatar } from "./ProfileAvatar";
-import { YoutubeLogin } from "./YoutubeLogin";
 
 export function ProfileMenu() {
   const client = useQueryClient();
   const session = useQuery({ queryKey: queryKeys.session, queryFn: api.session, enabled: false });
-  const online = useOnline();
   const [open, setOpen] = useState(false);
-  const [signingIn, setSigningIn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,18 +33,6 @@ export function ProfileMenu() {
     setOpen(false);
     await api.logout().catch(() => undefined);
     client.clear();
-  }
-
-  async function signInAgain(current: Profile) {
-    setOpen(false);
-    setError(null);
-    try {
-      await api.startYoutubeLogin(current.id);
-      client.removeQueries({ queryKey: queryKeys.youtubeLogin(current.id) });
-      setSigningIn(true);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "No se pudo abrir el navegador.");
-    }
   }
 
   return (
@@ -86,39 +72,91 @@ export function ProfileMenu() {
           <button
             role="menuitem"
             type="button"
-            disabled={!online}
-            onClick={() => signInAgain(profile)}
-            className="flex h-10 w-full items-center gap-4 px-4 text-sm hover:bg-yt-surface disabled:opacity-50"
+            onClick={() => {
+              setOpen(false);
+              setUpdating(true);
+            }}
+            className="flex h-10 w-full items-center gap-4 px-4 text-sm hover:bg-yt-surface"
           >
             <RetryIcon />
-            Volver a iniciar sesión en YouTube
+            Actualizar cookies de YouTube
           </button>
         </div>
       )}
-      {error && (
-        <p
-          role="alert"
-          className="absolute top-12 right-0 z-50 w-[260px] rounded-lg bg-yt-menu p-3 text-sm text-yt-error shadow-[0_4px_32px_rgba(0,0,0,0.25)]"
-        >
-          {error}
+      {updating && <CookiesDialog profile={profile} onClose={() => setUpdating(false)} />}
+    </div>
+  );
+}
+
+function CookiesDialog({ profile, onClose }: { profile: Profile; onClose: () => void }) {
+  const client = useQueryClient();
+  const [cookies, setCookies] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const update = useMutation({
+    mutationFn: () => api.updateCookies(profile.id, cookies),
+    onSuccess: (updated) => {
+      client.setQueryData(queryKeys.session, updated);
+      client.invalidateQueries({ queryKey: queryKeys.profiles });
+      client.invalidateQueries({ queryKey: queryKeys.channels });
+      onClose();
+    },
+    onError: (failure) => setError(cookiesError(failure)),
+  });
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (cookies.trim()) update.mutate();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-label="Actualizar cookies de YouTube"
+        onSubmit={submit}
+        onClick={(event) => event.stopPropagation()}
+        className="max-h-full w-full max-w-[560px] overflow-y-auto rounded-xl bg-yt-menu p-6 shadow-[0_4px_32px_rgba(0,0,0,0.1)]"
+      >
+        <h2 className="text-base font-medium">Actualizar cookies de YouTube</h2>
+        <p className="mt-2 mb-4 text-sm text-yt-text-secondary">
+          Hazlo cuando las descargas fallen con &quot;Sign in to confirm you&apos;re not a bot&quot;
+          o cuando quieras cambiar la cuenta de YouTube de {profile.name}.
         </p>
-      )}
-      {signingIn && (
-        <div className="fixed inset-0 z-[70]">
-          <YoutubeLogin
-            profile={profile}
-            onCancel={() => {
-              api.cancelYoutubeLogin(profile.id).catch(() => undefined);
-              setSigningIn(false);
-            }}
-            onDone={(ready) => {
-              client.setQueryData(queryKeys.session, ready);
-              client.invalidateQueries({ queryKey: queryKeys.channels });
-              setSigningIn(false);
-            }}
-          />
+        <CookiesField
+          value={cookies}
+          onChange={(value) => {
+            setCookies(value);
+            setError(null);
+          }}
+          error={error}
+        />
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 rounded-full px-4 text-sm font-medium hover:bg-yt-surface"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={!cookies.trim() || update.isPending}
+            className="h-9 rounded-full px-4 text-sm font-medium text-yt-link hover:bg-[#263850] disabled:opacity-50"
+          >
+            {update.isPending ? "Guardando…" : "Guardar"}
+          </button>
         </div>
-      )}
+      </form>
     </div>
   );
 }

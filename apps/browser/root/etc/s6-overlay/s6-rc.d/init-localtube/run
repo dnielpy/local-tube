@@ -1,4 +1,0 @@
-#!/usr/bin/with-contenv bash
-# The api reads and writes the same volume, so make sure the browser user owns its profiles.
-mkdir -p /data/profiles
-lsiown abc:abc /data /data/profiles

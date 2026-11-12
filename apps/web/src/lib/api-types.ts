@@ -336,17 +336,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/profiles/{profile_id}/youtube": {
+    "/api/profiles/{profile_id}/cookies": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["youtube_login_api_profiles__profile_id__youtube_get"];
-        put?: never;
-        post: operations["start_youtube_login_api_profiles__profile_id__youtube_post"];
-        delete: operations["cancel_youtube_login_api_profiles__profile_id__youtube_delete"];
+        get?: never;
+        put: operations["update_cookies_api_profiles__profile_id__cookies_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -449,6 +449,9 @@ export interface components {
             downloaded_count: number;
             avatar_url?: string | null;
         };
+        CookiesIn: {
+            cookies: string;
+        };
         DownloadCreate: {
             url: string;
             max_height?: number | null;
@@ -475,25 +478,20 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         JobStatus: "queued" | "downloading" | "processing" | "completed" | "failed" | "cancelled";
-        LoginOut: {
-            state: "waiting" | "ready" | "idle";
-            profile?: components["schemas"]["ProfileOut"] | null;
-        };
         PinIn: {
             pin: string;
         };
         ProfileCreate: {
+            cookies: string;
             name: string;
             pin: string;
         };
         ProfileOut: {
             id: string;
             name: string;
-            status: components["schemas"]["ProfileStatus"];
             avatar_url: string | null;
             youtube_name: string | null;
         };
-        ProfileStatus: "pending" | "ready";
         QualityOut: {
             height: number;
             size_bytes: number | null;
@@ -1329,7 +1327,7 @@ export interface operations {
             };
         };
     };
-    youtube_login_api_profiles__profile_id__youtube_get: {
+    update_cookies_api_profiles__profile_id__cookies_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -1340,75 +1338,19 @@ export interface operations {
                 localtube_session?: string | null;
             };
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CookiesIn"];
+            };
+        };
         responses: {
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LoginOut"];
+                    "application/json": components["schemas"]["ProfileOut"];
                 };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    start_youtube_login_api_profiles__profile_id__youtube_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profile_id: string;
-            };
-            cookie?: {
-                localtube_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LoginOut"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    cancel_youtube_login_api_profiles__profile_id__youtube_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profile_id: string;
-            };
-            cookie?: {
-                localtube_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             422: {
                 headers: {
@@ -1464,9 +1406,9 @@ export interface operations {
                 localtube_session?: string | null;
             };
         };
-        requestBody?: {
+        requestBody: {
             content: {
-                "application/json": components["schemas"]["PinIn"] | null;
+                "application/json": components["schemas"]["PinIn"];
             };
         };
         responses: {

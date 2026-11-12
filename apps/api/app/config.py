@@ -12,7 +12,6 @@ class Settings(BaseSettings):
     download_concurrency: int = 1
     worker_enabled: bool = True
     profiles_root: Path = Path("./config/profiles")
-    browser_url: str = "http://localhost:9000"
     default_max_height: int = 360
     connectivity_check: bool = True
     connectivity_url: str = "https://www.youtube.com/generate_204"

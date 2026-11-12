@@ -19,15 +19,14 @@ from sqlalchemy import text
 from app.config import get_settings
 from app.db import SessionLocal, engine
 from app.main import app
-from app.models import Base, Profile, ProfileStatus, Video
+from app.models import Base, Profile, Video
 from app.routers.channels import get_channel_service
-from app.routers.profiles import get_login
-from app.services.browser import BrowserError, BrowserSession
+from app.routers.profiles import get_youtube_cookies
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity
 from app.services.library import link_video
-from app.services.login import LoginService
 from app.services.profiles import SESSION_COOKIE, hash_pin, pin_guard, session_token
+from app.services.youtube_cookies import Account, YouTubeCookies
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -40,12 +39,14 @@ async def schema() -> AsyncIterator[None]:
 
 
 @pytest.fixture(autouse=True)
-async def clean_tables() -> AsyncIterator[None]:
+async def clean_tables(channel_service: ChannelService) -> AsyncIterator[None]:
     connectivity.reachable = True
     connectivity.forced_offline = False
     pin_guard._attempts.clear()
     shutil.rmtree(get_settings().media_root / ".cache", ignore_errors=True)
     yield
+    # Syncs started in the background must finish before the tables are emptied.
+    await channel_service.wait()
     async with engine.begin() as conn:
         await conn.execute(
             text(
@@ -62,11 +63,9 @@ def media_root() -> Path:
 
 @pytest.fixture
 def make_profile() -> Callable[..., Awaitable[Profile]]:
-    async def factory(
-        name: str = "Daniel", pin: str = "1234", status: ProfileStatus = ProfileStatus.ready
-    ) -> Profile:
+    async def factory(name: str = "Daniel", pin: str = "1234") -> Profile:
         async with SessionLocal() as session:
-            profile = Profile(name=name, pin_hash=hash_pin(pin), status=status)
+            profile = Profile(name=name, pin_hash=hash_pin(pin))
             session.add(profile)
             await session.commit()
             return profile
@@ -217,43 +216,28 @@ def channel_service(youtube: FakeYouTube, fetch: FakeFetch):
     app.dependency_overrides.pop(get_channel_service, None)
 
 
-class FakeBrowser:
-    COOKIES = "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSAPISID\tabc\n"
+COOKIES = (
+    "# Netscape HTTP Cookie File\n"
+    ".youtube.com\tTRUE\t/\tTRUE\t0\tSAPISID\tabc\n"
+    "#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t0\t__Secure-3PSID\tdef\n"
+)
 
+
+class FakeAccount:
     def __init__(self) -> None:
-        self.profile_id = None
-        self.running = False
-        self.signed_in = False
-        self.fail = False
-        self.calls: list[str] = []
-
-    async def start(self, profile_id) -> None:
-        if self.fail:
-            raise BrowserError("connection refused")
-        self.calls.append("start")
-        self.profile_id, self.running, self.signed_in = profile_id, True, False
-
-    async def session(self) -> BrowserSession:
-        if not self.signed_in:
-            return BrowserSession(profile_id=self.profile_id, running=self.running)
-        return BrowserSession(
-            profile_id=self.profile_id,
-            running=self.running,
-            signed_in=True,
-            cookies=self.COOKIES,
-            name="Daniel Quesada",
-            avatar_url="https://yt3.ggpht.com/photo=s88-c-k",
+        self.account: Account | None = Account(
+            name="Daniel Quesada", avatar_url="https://yt3.ggpht.com/photo=s88-c-k"
         )
+        self.files: list[str] = []
 
-    async def stop(self) -> None:
-        self.calls.append("stop")
-        self.running = False
+    async def __call__(self, cookies_file: str) -> Account | None:
+        self.files.append(cookies_file)
+        return self.account
 
 
 @pytest.fixture(autouse=True)
-def browser(channel_service, fetch) -> FakeBrowser:
-    fake = FakeBrowser()
-    login = LoginService(fake, channel_service, fetch)
-    app.dependency_overrides[get_login] = lambda: login
+def account(fetch) -> FakeAccount:
+    fake = FakeAccount()
+    app.dependency_overrides[get_youtube_cookies] = lambda: YouTubeCookies(fake, fetch)
     yield fake
-    app.dependency_overrides.pop(get_login, None)
+    app.dependency_overrides.pop(get_youtube_cookies, None)

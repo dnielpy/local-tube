@@ -5,13 +5,6 @@
 		reverse_proxy api:8000
 	}
 
-	handle /browser/* {
-		forward_auth api:8000 {
-			uri /api/profiles/browser-auth
-		}
-		reverse_proxy browser:3000
-	}
-
 	handle {
 		reverse_proxy web:3000
 	}

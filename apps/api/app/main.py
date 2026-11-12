@@ -6,14 +6,13 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.routers import channels, downloads, health, profiles, status, videos
-from app.services.browser import HttpBrowser
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity, youtube_probe
 from app.services.downloader import YtDlpDownloader
 from app.services.image_cache import http_fetch
-from app.services.login import LoginService
 from app.services.worker import DownloadWorker
 from app.services.youtube import YtDlpYouTubeClient
+from app.services.youtube_cookies import YouTubeCookies
 
 
 @asynccontextmanager
@@ -28,7 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await connectivity.load()
     channel_service = ChannelService(YtDlpYouTubeClient())
     app.state.channel_service = channel_service
-    app.state.login = LoginService(HttpBrowser(settings.browser_url), channel_service)
+    app.state.youtube_cookies = YouTubeCookies()
     downloader = YtDlpDownloader(settings.media_root)
     app.state.downloader = downloader
     worker = None

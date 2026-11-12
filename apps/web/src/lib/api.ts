@@ -12,7 +12,6 @@ export type RemoteVideoPage = components["schemas"]["RemoteVideoPage"];
 export type Status = components["schemas"]["StatusOut"];
 export type VideoFormats = components["schemas"]["VideoFormatsOut"];
 export type Profile = components["schemas"]["ProfileOut"];
-export type Login = components["schemas"]["LoginOut"];
 
 export class ApiError extends Error {
   constructor(
@@ -47,19 +46,17 @@ export const api = {
   profiles: () => request<Profile[]>("/profiles"),
   session: () => request<Profile>("/session"),
   logout: () => request<void>("/session", { method: "DELETE" }),
-  createProfile: (body: { name: string; pin: string }) =>
+  createProfile: (body: { name: string; pin: string; cookies: string }) =>
     request<Profile>("/profiles", { method: "POST", body: JSON.stringify(body) }),
   unlockProfile: (id: string, pin: string) =>
     request<Profile>(`/profiles/${id}/unlock`, { method: "POST", body: JSON.stringify({ pin }) }),
-  deleteProfile: (id: string, pin?: string) =>
-    request<void>(`/profiles/${id}`, {
-      method: "DELETE",
-      body: pin ? JSON.stringify({ pin }) : undefined,
+  deleteProfile: (id: string, pin: string) =>
+    request<void>(`/profiles/${id}`, { method: "DELETE", body: JSON.stringify({ pin }) }),
+  updateCookies: (id: string, cookies: string) =>
+    request<Profile>(`/profiles/${id}/cookies`, {
+      method: "PUT",
+      body: JSON.stringify({ cookies }),
     }),
-  youtubeLogin: (id: string) => request<Login>(`/profiles/${id}/youtube`),
-  startYoutubeLogin: (id: string) => request<Login>(`/profiles/${id}/youtube`, { method: "POST" }),
-  cancelYoutubeLogin: (id: string) =>
-    request<void>(`/profiles/${id}/youtube`, { method: "DELETE" }),
   videos: (params: { q?: string; channel?: string; limit?: number } = {}) => {
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
@@ -100,7 +97,6 @@ export const api = {
 export const queryKeys = {
   session: ["session"] as const,
   profiles: ["profiles"] as const,
-  youtubeLogin: (id: string) => ["youtube-login", id] as const,
   videos: (params: object = {}) => ["videos", params] as const,
   allVideos: ["videos"] as const,
   channels: ["channels"] as const,

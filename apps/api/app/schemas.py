@@ -1,10 +1,9 @@
 import uuid
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from app.models import JobStatus, ProfileStatus
+from app.models import JobStatus
 
 
 class VideoOut(BaseModel):
@@ -151,12 +150,18 @@ class ProfileOut(BaseModel):
 
     id: uuid.UUID
     name: str
-    status: ProfileStatus
     avatar_url: str | None
     youtube_name: str | None
 
 
-class ProfileCreate(BaseModel):
+COOKIES_MAX_LENGTH = 200_000
+
+
+class CookiesIn(BaseModel):
+    cookies: str = Field(min_length=1, max_length=COOKIES_MAX_LENGTH)
+
+
+class ProfileCreate(CookiesIn):
     name: str = Field(min_length=1, max_length=40)
     pin: str = Field(pattern=PIN_PATTERN)
 
@@ -171,8 +176,3 @@ class ProfileCreate(BaseModel):
 
 class PinIn(BaseModel):
     pin: str = Field(pattern=PIN_PATTERN)
-
-
-class LoginOut(BaseModel):
-    state: Literal["waiting", "ready", "idle"]
-    profile: ProfileOut | None = None

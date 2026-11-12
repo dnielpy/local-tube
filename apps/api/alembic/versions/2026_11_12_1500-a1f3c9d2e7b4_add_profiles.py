@@ -16,7 +16,6 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("pin_hash", sa.Text(), nullable=False),
-        sa.Column("status", sa.Enum("pending", "ready", name="profile_status"), nullable=False),
         sa.Column("avatar_path", sa.Text(), nullable=True),
         sa.Column("youtube_name", sa.Text(), nullable=True),
         sa.Column("signed_in_at", sa.DateTime(timezone=True), nullable=True),
@@ -42,4 +41,3 @@ def downgrade() -> None:
     op.drop_index("ix_download_jobs_profile_id", "download_jobs")
     op.drop_column("download_jobs", "profile_id")
     op.drop_table("profiles")
-    sa.Enum(name="profile_status").drop(op.get_bind())

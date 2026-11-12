@@ -3,67 +3,58 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
-import { api, queryKeys, type Profile } from "@/lib/api";
+import { api, ApiError, queryKeys, type Profile } from "@/lib/api";
 
 import { BackIcon, Logo } from "../icons";
+import { CookiesField } from "./CookiesField";
 import { PinPad } from "./PinPad";
 import { ProfileAvatar } from "./ProfileAvatar";
-import { YoutubeLogin } from "./YoutubeLogin";
 
-type Step = { name: "name" } | { name: "pin" } | { name: "confirm"; pin: string };
+type Step =
+  | { name: "name" }
+  | { name: "pin" }
+  | { name: "confirm"; pin: string }
+  | { name: "cookies"; pin: string };
 
-/** Name, PIN, and then the YouTube sign-in, which every profile needs. */
-export function CreateProfile({
-  onCancel,
-  pending,
-}: {
-  onCancel: () => void;
-  /** A profile created earlier whose YouTube sign-in did not finish. */
-  pending?: Profile;
-}) {
-  const client = useQueryClient();
+export function cookiesError(error: unknown): string {
+  if (error instanceof ApiError && error.status === 422) {
+    const detail = error.detail as { message?: string } | unknown[];
+    if (!Array.isArray(detail) && detail?.message) return detail.message;
+    return "Revisa las cookies: el archivo es demasiado grande o está vacío.";
+  }
+  return error instanceof Error ? error.message : "No se pudo guardar el perfil.";
+}
+
+/** Name, PIN, and the YouTube cookies the profile downloads with. */
+export function CreateProfile({ onCancel }: { onCancel: () => void }) {
   const [step, setStep] = useState<Step>({ name: "name" });
   const [name, setName] = useState("");
+  const [cookies, setCookies] = useState("");
   const [failures, setFailures] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const create = useMutation({
-    mutationFn: (pin: string) => api.createProfile({ name: name.trim(), pin }),
-    onSuccess: (profile) => client.setQueryData(queryKeys.session, profile),
-    onError: (failure) => setError(failure.message),
+    mutationFn: (pin: string) => api.createProfile({ name: name.trim(), pin, cookies }),
+    onError: (failure) => setError(cookiesError(failure)),
   });
-  const profile = pending ?? create.data;
+  const created = create.data;
 
-  async function cancel() {
-    if (profile) {
-      await api.deleteProfile(profile.id).catch(() => undefined);
-      client.setQueryData(queryKeys.session, undefined);
-      client.invalidateQueries({ queryKey: queryKeys.session });
-    }
-    onCancel();
-  }
-
-  if (profile) {
-    return (
-      <YoutubeLogin
-        profile={profile}
-        onCancel={cancel}
-        onDone={(ready) => {
-          client.clear();
-          client.setQueryData(queryKeys.session, ready);
-        }}
-      />
-    );
-  }
+  if (created) return <Welcome profile={created} />;
 
   function submitName(event: FormEvent) {
     event.preventDefault();
     if (name.trim()) setStep({ name: "pin" });
   }
 
+  function submitCookies(event: FormEvent) {
+    event.preventDefault();
+    if (step.name === "cookies" && cookies.trim()) create.mutate(step.pin);
+  }
+
   const back = () => {
     setError(null);
     if (step.name === "name") onCancel();
-    else setStep(step.name === "confirm" ? { name: "pin" } : { name: "name" });
+    else if (step.name === "pin") setStep({ name: "name" });
+    else setStep({ name: "pin" });
   };
 
   return (
@@ -80,7 +71,7 @@ export function CreateProfile({
         <Logo />
       </div>
       <div className="flex flex-1 flex-col items-center justify-center px-4 pb-24 text-center">
-        {step.name === "name" ? (
+        {step.name === "name" && (
           <form onSubmit={submitName} className="flex w-full max-w-[400px] flex-col items-center">
             <h1 className="text-3xl mini:text-4xl">Agregar perfil</h1>
             <p className="mt-3 text-yt-text-secondary">
@@ -106,7 +97,9 @@ export function CreateProfile({
               Continuar
             </button>
           </form>
-        ) : (
+        )}
+
+        {(step.name === "pin" || step.name === "confirm") && (
           <div key={step.name}>
             <h1 className="text-2xl mini:text-3xl">
               {step.name === "pin" ? "Elige un PIN de 4 dígitos" : "Repite el PIN"}
@@ -120,7 +113,6 @@ export function CreateProfile({
               <PinPad
                 failures={failures}
                 error={error}
-                disabled={create.isPending}
                 onComplete={(pin) => {
                   setError(null);
                   if (step.name === "pin") {
@@ -130,17 +122,67 @@ export function CreateProfile({
                     setFailures((value) => value + 1);
                     setStep({ name: "pin" });
                   } else {
-                    create.mutate(pin);
+                    setStep({ name: "cookies", pin });
                   }
                 }}
               />
             </div>
-            {create.isPending && (
-              <p className="text-sm text-yt-text-secondary">Abriendo el navegador…</p>
-            )}
           </div>
         )}
+
+        {step.name === "cookies" && (
+          <form
+            onSubmit={submitCookies}
+            className="flex w-full max-w-[560px] flex-col items-center"
+          >
+            <h1 className="text-2xl mini:text-3xl">Conecta tu cuenta de YouTube</h1>
+            <p className="mt-2 mb-6 text-yt-text-secondary">
+              Pega tus cookies de YouTube. Con ellas el perfil descarga videos y ve tus
+              suscripciones, y tu foto de YouTube pasa a ser la del perfil.
+            </p>
+            <CookiesField
+              value={cookies}
+              onChange={(value) => {
+                setCookies(value);
+                setError(null);
+              }}
+              error={error}
+            />
+            <button
+              type="submit"
+              disabled={!cookies.trim() || create.isPending}
+              className="mt-6 h-10 rounded-full bg-yt-cta-bg px-8 text-sm font-medium text-yt-cta-text hover:bg-yt-cta-hover disabled:opacity-40"
+            >
+              {create.isPending ? "Creando perfil…" : "Crear perfil"}
+            </button>
+          </form>
+        )}
       </div>
+    </div>
+  );
+}
+
+function Welcome({ profile }: { profile: Profile }) {
+  const client = useQueryClient();
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-yt-bg px-4 text-center">
+      <ProfileAvatar profile={profile} size={120} />
+      <h1 className="mt-6 text-2xl mini:text-3xl">¡Listo, {profile.name}!</h1>
+      <p className="mt-2 text-yt-text-secondary">
+        {profile.youtube_name
+          ? `Conectado a YouTube como ${profile.youtube_name}.`
+          : "Tus cookies de YouTube están guardadas."}
+      </p>
+      <button
+        type="button"
+        onClick={() => {
+          client.clear();
+          client.setQueryData(queryKeys.session, profile);
+        }}
+        className="mt-8 h-10 rounded-full bg-yt-cta-bg px-8 text-sm font-medium text-yt-cta-text hover:bg-yt-cta-hover"
+      >
+        Empezar
+      </button>
     </div>
   );
 }

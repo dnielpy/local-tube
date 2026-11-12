@@ -1,19 +1,17 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { use, type ReactNode } from "react";
 import { browser } from "react-dom";
 
 import { api, ApiError, queryKeys } from "@/lib/api";
 import { setProgressProfile } from "@/lib/watch-progress";
 
-import { CreateProfile } from "./CreateProfile";
 import { ProfilePicker } from "./ProfilePicker";
 
 /** Shows the profile picker until a profile is unlocked, and the app after. */
 export function ProfileGate({ children }: { children: ReactNode }) {
   use(browser("The profile session lives in a cookie only the api can read."));
-  const client = useQueryClient();
   const session = useQuery({
     queryKey: queryKeys.session,
     queryFn: api.session,
@@ -40,15 +38,6 @@ export function ProfileGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (session.data.status === "pending") {
-    return (
-      <CreateProfile
-        pending={session.data}
-        onCancel={() => client.invalidateQueries({ queryKey: queryKeys.session })}
-      />
-    );
-  }
-
   setProgressProfile(session.data.id);
   return children;
 }

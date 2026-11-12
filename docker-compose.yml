@@ -25,26 +25,12 @@ services:
       DOWNLOAD_CONCURRENCY: ${DOWNLOAD_CONCURRENCY:-1}
       DEFAULT_MAX_HEIGHT: ${DEFAULT_MAX_HEIGHT:-360}
       PROFILES_ROOT: /config/profiles
-      BROWSER_URL: http://browser:9000
     volumes:
       - ${MEDIA_PATH:?set MEDIA_PATH in .env}:/media
       - localtube-config:/config
     depends_on:
       postgres:
         condition: service_healthy
-
-  # Chromium for signing profiles in to YouTube. Only reachable through Caddy at /browser/,
-  # and only by the profile that is signing in. Chromium itself runs only during a sign-in.
-  browser:
-    build: ./apps/browser
-    restart: unless-stopped
-    shm_size: 1gb
-    environment:
-      PUID: ${BROWSER_PUID:-1000}
-      PGID: ${BROWSER_PGID:-1000}
-      TZ: ${TZ:-Etc/UTC}
-    volumes:
-      - localtube-config:/data
 
   web:
     build:
@@ -65,7 +51,6 @@ services:
     depends_on:
       - api
       - web
-      - browser
 
 volumes:
   pgdata:

@@ -11,7 +11,7 @@ from fastapi import Cookie, Depends, HTTPException, Response, status
 
 from app.config import get_settings
 from app.db import SessionDep
-from app.models import Profile, ProfileStatus
+from app.models import Profile
 from app.settings_store import read_setting, write_setting
 
 SESSION_COOKIE = "localtube_session"
@@ -28,7 +28,7 @@ def profile_dir(profile_id: uuid.UUID) -> Path:
 
 
 def cookies_path(profile_id: uuid.UUID | None) -> str | None:
-    """The cookies.txt yt-dlp uses for a profile, when it has signed in to YouTube."""
+    """The cookies.txt yt-dlp uses for a profile's downloads and subscriptions."""
     if profile_id is None:
         return None
     path = profile_dir(profile_id) / "cookies.txt"
@@ -108,7 +108,7 @@ async def optional_profile(
     return await _session_profile(session, localtube_session)
 
 
-async def any_profile(
+async def current_profile(
     session: SessionDep, localtube_session: Annotated[str | None, Cookie()] = None
 ) -> Profile:
     profile = await _session_profile(session, localtube_session)
@@ -117,14 +117,7 @@ async def any_profile(
     return profile
 
 
-async def current_profile(profile: Annotated[Profile, Depends(any_profile)]) -> Profile:
-    if profile.status != ProfileStatus.ready:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Finish signing in to YouTube")
-    return profile
-
-
 OptionalProfileDep = Annotated[Profile | None, Depends(optional_profile)]
-AnyProfileDep = Annotated[Profile, Depends(any_profile)]
 ProfileDep = Annotated[Profile, Depends(current_profile)]
 
 
