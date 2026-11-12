@@ -18,6 +18,7 @@ from app.schemas import (
 )
 from app.services.channels import PAGE_SIZE, ChannelService
 from app.services.connectivity import connectivity
+from app.services.profiles import ProfileDep
 from app.services.youtube import YouTubeError
 
 router = APIRouter(tags=["channels"])
@@ -100,13 +101,13 @@ async def _channel_list(session: SessionDep, syncing: bool) -> ChannelList:
 
 
 @router.get("/channels", response_model=ChannelList)
-async def list_channels(session: SessionDep, service: ServiceDep) -> ChannelList:
+async def list_channels(session: SessionDep, service: ServiceDep, _: ProfileDep) -> ChannelList:
     syncing = await service.schedule_subscriptions()
     return await _channel_list(session, syncing)
 
 
 @router.post("/channels/sync", response_model=ChannelList)
-async def sync_channels(session: SessionDep, service: ServiceDep) -> ChannelList:
+async def sync_channels(session: SessionDep, service: ServiceDep, _: ProfileDep) -> ChannelList:
     if not connectivity.online:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, {"message": "Sin conexión"})
     syncing = await service.schedule_subscriptions(force=True)
@@ -147,7 +148,11 @@ async def _remote_videos(
 
 @router.get("/channels/{channel_id}", response_model=ChannelDetail)
 async def get_channel(
-    channel_id: str, session: SessionDep, service: ServiceDep, refresh: bool = False
+    channel_id: str,
+    session: SessionDep,
+    service: ServiceDep,
+    _: ProfileDep,
+    refresh: bool = False,
 ) -> ChannelDetail:
     if refresh and not connectivity.online:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, {"message": "Sin conexión"})
@@ -205,6 +210,7 @@ async def channel_videos(
     channel_id: str,
     session: SessionDep,
     service: ServiceDep,
+    _: ProfileDep,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> RemoteVideoPage:
     if not connectivity.online:

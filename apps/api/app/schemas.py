@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from app.models import JobStatus
+from app.models import JobStatus, ProfileStatus
 
 
 class VideoOut(BaseModel):
@@ -140,3 +140,33 @@ class ChannelDetail(BaseModel):
     latest: list[RemoteVideoOut]
     latest_fetched_at: datetime | None
     downloaded: list[VideoOut]
+
+
+PIN_PATTERN = r"^\d{4}$"
+
+
+class ProfileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    status: ProfileStatus
+    avatar_url: str | None
+    youtube_name: str | None
+
+
+class ProfileCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    pin: str = Field(pattern=PIN_PATTERN)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("name cannot be blank")
+        return value
+
+
+class PinIn(BaseModel):
+    pin: str = Field(pattern=PIN_PATTERN)

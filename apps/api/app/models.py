@@ -83,6 +83,32 @@ class ChannelVideo(Base):
     position: Mapped[int] = mapped_column(Integer)
 
 
+class ProfileStatus(enum.StrEnum):
+    pending = "pending"
+    ready = "ready"
+
+
+class Profile(Base):
+    __tablename__ = "profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(Text)
+    pin_hash: Mapped[str] = mapped_column(Text)
+    status: Mapped[ProfileStatus] = mapped_column(
+        Enum(ProfileStatus, name="profile_status"), default=ProfileStatus.pending
+    )
+    avatar_path: Mapped[str | None] = mapped_column(Text)
+    youtube_name: Mapped[str | None] = mapped_column(Text)
+    signed_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def avatar_url(self) -> str | None:
+        if not self.avatar_path:
+            return None
+        return f"/api/profiles/{self.id}/avatar?v={self.avatar_path.rsplit('-', 1)[-1]}"
+
+
 class AppSetting(Base):
     __tablename__ = "app_settings"
 
@@ -118,6 +144,9 @@ class DownloadJob(Base):
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     video_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("videos.id", ondelete="SET NULL"))
+    profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

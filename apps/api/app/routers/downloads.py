@@ -13,9 +13,10 @@ from app.models import DownloadJob, JobStatus, Video
 from app.schemas import DownloadCreate, DownloadJobOut, QualityOut, VideoFormatsOut
 from app.services.connectivity import connectivity
 from app.services.downloader import DownloadError, Quality, YtDlpDownloader, parse_youtube_id
+from app.services.profiles import current_profile
 from app.services.worker import ACTIVE_STATUSES, DownloadWorker
 
-router = APIRouter(prefix="/downloads", tags=["downloads"])
+router = APIRouter(prefix="/downloads", tags=["downloads"], dependencies=[Depends(current_profile)])
 
 
 def get_worker(request: Request) -> DownloadWorker | None:

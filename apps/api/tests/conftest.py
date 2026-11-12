@@ -18,10 +18,11 @@ from sqlalchemy import text
 from app.config import get_settings
 from app.db import SessionLocal, engine
 from app.main import app
-from app.models import Base, Video
+from app.models import Base, Profile, ProfileStatus, Video
 from app.routers.channels import get_channel_service
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity
+from app.services.profiles import SESSION_COOKIE, hash_pin, pin_guard, session_token
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -37,11 +38,15 @@ async def schema() -> AsyncIterator[None]:
 async def clean_tables() -> AsyncIterator[None]:
     connectivity.reachable = True
     connectivity.forced_offline = False
+    pin_guard._attempts.clear()
     shutil.rmtree(get_settings().media_root / ".cache", ignore_errors=True)
     yield
     async with engine.begin() as conn:
         await conn.execute(
-            text("TRUNCATE download_jobs, videos, app_settings, channel_videos, channels CASCADE")
+            text(
+                "TRUNCATE download_jobs, videos, app_settings, channel_videos, channels, "
+                "profiles CASCADE"
+            )
         )
 
 
@@ -51,8 +56,34 @@ def media_root() -> Path:
 
 
 @pytest.fixture
-async def client() -> AsyncIterator[AsyncClient]:
+def make_profile() -> Callable[..., Awaitable[Profile]]:
+    async def factory(
+        name: str = "Daniel", pin: str = "1234", status: ProfileStatus = ProfileStatus.ready
+    ) -> Profile:
+        async with SessionLocal() as session:
+            profile = Profile(name=name, pin_hash=hash_pin(pin), status=status)
+            session.add(profile)
+            await session.commit()
+            return profile
+
+    return factory
+
+
+@pytest.fixture
+async def anon_client() -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        yield c
+
+
+@pytest.fixture
+async def profile(make_profile) -> Profile:
+    return await make_profile()
+
+
+@pytest.fixture
+async def client(profile: Profile) -> AsyncIterator[AsyncClient]:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        c.cookies.set(SESSION_COOKIE, await session_token(profile.id))
         yield c
 
 

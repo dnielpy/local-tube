@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 
@@ -9,8 +9,9 @@ from app.db import SessionDep
 from app.media import media_path, remove_video_dir
 from app.models import Video
 from app.schemas import VideoOut, VideoPage
+from app.services.profiles import current_profile
 
-router = APIRouter(prefix="/videos", tags=["videos"])
+router = APIRouter(prefix="/videos", tags=["videos"], dependencies=[Depends(current_profile)])
 
 
 async def _get_video(session: SessionDep, video_id: uuid.UUID) -> Video:
