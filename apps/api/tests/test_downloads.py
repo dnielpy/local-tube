@@ -1,9 +1,15 @@
+import asyncio
+import threading
+import time
+
 import pytest
 
 from app.db import SessionLocal
+from app.main import app
 from app.models import DownloadJob, JobStatus
 from app.services.connectivity import connectivity
 from app.services.downloader import (
+    DownloadCancelled,
     DownloadError,
     DownloadResult,
     Probe,
@@ -27,7 +33,9 @@ class FakeDownloader:
             raise DownloadError(self.fail_with)
         return Probe(youtube_id="dQw4w9WgXcQ", title="Never Gonna Give You Up", info={})
 
-    def download(self, probe: Probe, on_progress, max_height=None) -> DownloadResult:
+    def download(
+        self, probe: Probe, on_progress, max_height=None, should_cancel=lambda: False
+    ) -> DownloadResult:
         self.downloads += 1
         self.max_height = max_height
         on_progress(Progress("downloading", percent=50, speed=2 * 1024 * 1024, eta=30))
@@ -226,7 +234,7 @@ async def test_worker_caches_thumbnail_duration_and_size(client, media_root, fet
             probe.info["duration"] = 213
             return probe
 
-        def download(self, probe, on_progress, max_height=None):
+        def download(self, probe, on_progress, max_height=None, should_cancel=lambda: False):
             on_progress(Progress("downloading", percent=10, total_bytes=12_600_000))
             return super().download(probe, on_progress, max_height)
 
@@ -240,3 +248,69 @@ async def test_worker_caches_thumbnail_duration_and_size(client, media_root, fet
     assert fetch.urls == ["https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"]
     thumbnail = await client.get(done["thumbnail_url"])
     assert thumbnail.status_code == 200
+
+
+class SlowDownloader(FakeDownloader):
+    def __init__(self, media_root) -> None:
+        super().__init__(media_root)
+        self.started = threading.Event()
+
+    def download(self, probe, on_progress, max_height=None, should_cancel=lambda: False):
+        directory = self.media_root / probe.youtube_id
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "video.mp4.part").write_bytes(b"partial")
+        self.started.set()
+        for _ in range(500):
+            if should_cancel():
+                raise DownloadCancelled("Cancelled")
+            on_progress(Progress("downloading", percent=5))
+            time.sleep(0.01)
+        raise AssertionError("the download was never cancelled")
+
+
+async def test_cancel_queued_download(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+
+    cancelled = await client.post(f"/api/downloads/{job['id']}/cancel")
+
+    assert cancelled.json()["status"] == "cancelled"
+    assert await DownloadWorker(FakeDownloader(media_root)).run_once() is False
+
+
+async def test_cancel_running_download_stops_it_and_removes_partial_files(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    downloader = SlowDownloader(media_root)
+    worker = DownloadWorker(downloader)
+    app.state.worker = worker
+    try:
+        running = asyncio.create_task(worker.run_once())
+        await asyncio.to_thread(downloader.started.wait, 5)
+
+        response = await client.post(f"/api/downloads/{job['id']}/cancel")
+        await asyncio.wait_for(running, 5)
+    finally:
+        app.state.worker = None
+
+    assert response.status_code == 200
+    done = (await client.get(f"/api/downloads/{job['id']}")).json()
+    assert done["status"] == "cancelled"
+    assert not (media_root / "dQw4w9WgXcQ").exists()
+    assert (await client.get("/api/videos")).json()["total"] == 0
+
+
+async def test_cancelled_download_can_be_retried(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    await client.post(f"/api/downloads/{job['id']}/cancel")
+
+    retried = await client.post(f"/api/downloads/{job['id']}/retry")
+    await DownloadWorker(FakeDownloader(media_root)).run_once()
+
+    assert retried.json()["status"] == "queued"
+    assert (await client.get(f"/api/downloads/{job['id']}")).json()["status"] == "completed"
+
+
+async def test_cannot_cancel_finished_download(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    await DownloadWorker(FakeDownloader(media_root)).run_once()
+
+    assert (await client.post(f"/api/downloads/{job['id']}/cancel")).status_code == 409

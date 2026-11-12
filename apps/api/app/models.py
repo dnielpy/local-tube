@@ -96,6 +96,7 @@ class JobStatus(enum.StrEnum):
     processing = "processing"
     completed = "completed"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 class DownloadJob(Base):

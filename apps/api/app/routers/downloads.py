@@ -139,8 +139,10 @@ async def download_thumbnail(session: SessionDep, job_id: uuid.UUID) -> FileResp
 @router.post("/{job_id}/retry", response_model=DownloadJobOut)
 async def retry_download(session: SessionDep, worker: WorkerDep, job_id: uuid.UUID) -> DownloadJob:
     job = await _get_job(session, job_id)
-    if job.status != JobStatus.failed:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Only failed downloads can be retried")
+    if job.status not in (JobStatus.failed, JobStatus.cancelled):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Only failed or cancelled downloads can be retried"
+        )
     job.status = JobStatus.queued
     job.progress = 0
     job.error = None
@@ -148,6 +150,22 @@ async def retry_download(session: SessionDep, worker: WorkerDep, job_id: uuid.UU
     await session.refresh(job)
     if worker is not None:
         worker.notify()
+    return job
+
+
+@router.post("/{job_id}/cancel", response_model=DownloadJobOut)
+async def cancel_download(session: SessionDep, worker: WorkerDep, job_id: uuid.UUID) -> DownloadJob:
+    job = await session.get(DownloadJob, job_id, with_for_update=True)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Download not found")
+    if job.status not in ACTIVE_STATUSES:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This download is not running")
+    running = job.status != JobStatus.queued and worker is not None and worker.cancel(job.id)
+    if not running:
+        job.status = JobStatus.cancelled
+        job.speed = job.eta = None
+    await session.commit()
+    await session.refresh(job)
     return job
 
 

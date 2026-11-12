@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import threading
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Protocol
@@ -8,9 +9,16 @@ from typing import Protocol
 from sqlalchemy import select, update
 
 from app.db import SessionLocal
+from app.media import remove_video_dir
 from app.models import DownloadJob, JobStatus, Video
 from app.services.connectivity import connectivity
-from app.services.downloader import DownloadError, DownloadResult, Probe, Progress
+from app.services.downloader import (
+    DownloadCancelled,
+    DownloadError,
+    DownloadResult,
+    Probe,
+    Progress,
+)
 from app.services.image_cache import ImageFetcher, cache_image
 from app.services.youtube import video_thumbnail_url
 
@@ -26,7 +34,11 @@ class Downloader(Protocol):
     def probe(self, url: str) -> Probe: ...
 
     def download(
-        self, probe: Probe, on_progress: "ProgressCallback", max_height: int | None = None
+        self,
+        probe: Probe,
+        on_progress: "ProgressCallback",
+        max_height: int | None = None,
+        should_cancel: Callable[[], bool] = ...,
     ) -> DownloadResult: ...
 
 
@@ -43,6 +55,7 @@ class DownloadWorker:
         fetch_image: ImageFetcher | None = None,
     ) -> None:
         self.fetch_image = fetch_image
+        self._cancel: dict[uuid.UUID, threading.Event] = {}
         self.downloader = downloader
         self.concurrency = concurrency
         self.on_video_added = on_video_added
@@ -64,6 +77,13 @@ class DownloadWorker:
     def notify(self) -> None:
         self._wakeup.set()
 
+    def cancel(self, job_id: uuid.UUID) -> bool:
+        event = self._cancel.get(job_id)
+        if event is None:
+            return False
+        event.set()
+        return True
+
     async def _loop(self) -> None:
         while True:
             try:
@@ -83,17 +103,30 @@ class DownloadWorker:
         if claimed is None:
             return False
         job_id, url, max_height = claimed
+        cancelled = self._cancel[job_id] = threading.Event()
         try:
-            await self._process(job_id, url, max_height)
+            await self._process(job_id, url, max_height, cancelled)
+        except DownloadCancelled:
+            await _update_job(job_id, status=JobStatus.cancelled, error=None, speed=None, eta=None)
         except DownloadError as exc:
             await _update_job(job_id, status=JobStatus.failed, error=str(exc), speed=None, eta=None)
         except Exception as exc:
             logger.exception("download %s failed", job_id)
             await _update_job(job_id, status=JobStatus.failed, error=str(exc), speed=None, eta=None)
+        finally:
+            self._cancel.pop(job_id, None)
         return True
 
-    async def _process(self, job_id: uuid.UUID, url: str, max_height: int | None) -> None:
+    async def _process(
+        self,
+        job_id: uuid.UUID,
+        url: str,
+        max_height: int | None,
+        cancelled: threading.Event,
+    ) -> None:
         probe = await asyncio.to_thread(self.downloader.probe, url)
+        if cancelled.is_set():
+            raise DownloadCancelled("Cancelled")
         duration = probe.info.get("duration")
         await _update_job(
             job_id,
@@ -118,13 +151,23 @@ class DownloadWorker:
 
         latest: list[Progress] = []
         download = asyncio.create_task(
-            asyncio.to_thread(self.downloader.download, probe, latest.append, max_height)
+            asyncio.to_thread(
+                self.downloader.download, probe, latest.append, max_height, cancelled.is_set
+            )
         )
         while not download.done():
             await asyncio.wait({download}, timeout=FLUSH_INTERVAL)
+            if not cancelled.is_set():
+                await _flush_progress(job_id, latest)
+        try:
+            if cancelled.is_set():
+                raise DownloadCancelled("Cancelled")
             await _flush_progress(job_id, latest)
-        await _flush_progress(job_id, latest)
-        result = download.result()
+            result = download.result()
+        except DownloadCancelled:
+            if await _find_video(probe.youtube_id) is None:
+                remove_video_dir(probe.youtube_id)
+            raise
 
         if self.on_video_added is not None:
             try:

@@ -97,6 +97,14 @@ class DownloadError(Exception):
     pass
 
 
+class DownloadCancelled(DownloadError):
+    pass
+
+
+def _never() -> bool:
+    return False
+
+
 def parse_youtube_id(url: str) -> str | None:
     if not YoutubeIE.suitable(url):
         return None
@@ -127,6 +135,7 @@ class YtDlpDownloader:
         self,
         on_progress: Callable[[Progress], None] | None = None,
         max_height: int | None = None,
+        should_cancel: Callable[[], bool] = _never,
     ) -> dict[str, Any]:
         options: dict[str, Any] = {
             **base_options(self.cookies_file, self.cookies_from_browser),
@@ -144,10 +153,21 @@ class YtDlpDownloader:
             ],
         }
         if on_progress is not None:
-            options["progress_hooks"] = [_progress_hook(on_progress)]
-            options["postprocessor_hooks"] = [
-                lambda d: d["status"] == "started" and on_progress(Progress("processing"))
-            ]
+            report = _progress_hook(on_progress)
+
+            def progress_hook(d: dict[str, Any]) -> None:
+                if should_cancel():
+                    raise yt_dlp.utils.DownloadCancelled()
+                report(d)
+
+            def postprocessor_hook(d: dict[str, Any]) -> None:
+                if should_cancel():
+                    raise yt_dlp.utils.DownloadCancelled()
+                if d["status"] == "started":
+                    on_progress(Progress("processing"))
+
+            options["progress_hooks"] = [progress_hook]
+            options["postprocessor_hooks"] = [postprocessor_hook]
         return options
 
     def probe(self, url: str) -> Probe:
@@ -183,11 +203,16 @@ class YtDlpDownloader:
         probe: Probe,
         on_progress: Callable[[Progress], None],
         max_height: int | None = None,
+        should_cancel: Callable[[], bool] = _never,
     ) -> DownloadResult:
         try:
-            with yt_dlp.YoutubeDL(self._options(on_progress, max_height)) as ydl:
+            with yt_dlp.YoutubeDL(self._options(on_progress, max_height, should_cancel)) as ydl:
                 info = ydl.process_ie_result(probe.info, download=True)
+        except yt_dlp.utils.DownloadCancelled as exc:
+            raise DownloadCancelled("Cancelled") from exc
         except yt_dlp.utils.YoutubeDLError as exc:
+            if should_cancel():
+                raise DownloadCancelled("Cancelled") from exc
             raise DownloadError(clean_error(exc)) from exc
 
         video_file = Path(info["requested_downloads"][0]["filepath"])
