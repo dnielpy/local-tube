@@ -1,13 +1,13 @@
 # Postgres only, for running the api and web on the host during development.
 services:
   postgres:
-    image: postgres:17
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: localtube
       POSTGRES_PASSWORD: localtube
       POSTGRES_DB: localtube
     ports:
-      - "5432:5432"
+      - "5442:5432"
     volumes:
       - pgdata-dev:/var/lib/postgresql/data
 
