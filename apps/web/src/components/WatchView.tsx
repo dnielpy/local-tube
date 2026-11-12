@@ -7,6 +7,7 @@ import { use, useEffect, useState } from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys, type Video } from "@/lib/api";
+import { channelHref } from "@/lib/format";
 import { useDeleteVideo } from "@/lib/use-delete-video";
 
 import { ChannelAvatar } from "./ChannelAvatar";
@@ -108,10 +109,7 @@ function VideoInfo({ video }: { video: Video }) {
     <div className="pb-6">
       <h1 className="mt-3 line-clamp-2 text-xl leading-7 font-bold break-words">{video.title}</h1>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href={`/?channel=${encodeURIComponent(video.channel ?? "")}`}
-          className="flex min-w-0 items-center gap-3"
-        >
+        <Link href={channelHref(video)} className="flex min-w-0 items-center gap-3">
           <ChannelAvatar name={video.channel} size={40} />
           <span className="truncate text-base font-medium">{video.channel ?? "Desconocido"}</span>
         </Link>

@@ -1,3 +1,4 @@
+
 export interface paths {
     "/api/health": {
         parameters: {
@@ -143,10 +144,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_status_api_status_get"];
+        put: operations["update_status_api_status_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_channels_api_channels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["sync_channels_api_channels_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channel_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_channel_api_channels__channel_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channel_id}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["channel_avatar_api_channels__channel_id__avatar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channel_id}/banner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["channel_banner_api_channels__channel_id__banner_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channel-videos/{youtube_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["channel_video_thumbnail_api_channel_videos__youtube_id__thumbnail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ChannelDetail: {
+            id: string;
+            known: boolean;
+            refreshing: boolean;
+            name: string;
+            handle: string | null;
+            description: string | null;
+            subscriber_count: number | null;
+            subscribed: boolean;
+            avatar_url: string | null;
+            banner_url: string | null;
+            youtube_url: string;
+            online: boolean;
+            latest: components["schemas"]["RemoteVideoOut"][];
+            latest_fetched_at: string | null;
+            downloaded: components["schemas"]["VideoOut"][];
+        };
+        ChannelList: {
+            syncing: boolean;
+            items: components["schemas"]["ChannelOut"][];
+        };
+        ChannelOut: {
+            id: string | null;
+            name: string;
+            handle?: string | null;
+            subscribed: boolean;
+            downloaded_count: number;
+            avatar_url?: string | null;
+        };
         DownloadCreate: {
             url: string;
             max_height?: number | null;
@@ -154,6 +296,7 @@ export interface components {
         DownloadJobOut: {
             id: string;
             url: string;
+            youtube_id: string | null;
             status: components["schemas"]["JobStatus"];
             progress: number;
             speed: string | null;
@@ -169,6 +312,25 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         JobStatus: "queued" | "downloading" | "processing" | "completed" | "failed";
+        RemoteVideoOut: {
+            youtube_id: string;
+            title: string;
+            duration_seconds: number | null;
+            view_count: number | null;
+            published_at: string | null;
+            thumbnail_url: string | null;
+            youtube_url: string;
+            video_id?: string | null;
+        };
+        StatusOut: {
+            online: boolean;
+            reachable: boolean;
+            forced_offline: boolean;
+            checked_at: string | null;
+        };
+        StatusUpdate: {
+            forced_offline: boolean;
+        };
         ValidationError: {
             loc: (string | number)[];
             msg: string;
@@ -183,6 +345,7 @@ export interface components {
             description: string;
             youtube_url: string;
             channel: string | null;
+            channel_id: string | null;
             duration_seconds: number | null;
             file_size: number | null;
             created_at: string;
@@ -228,6 +391,7 @@ export interface operations {
             query?: {
                 q?: string | null;
                 channel?: string | null;
+                channel_id?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -511,6 +675,212 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DownloadJobOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_api_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+        };
+    };
+    update_status_api_status_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_channels_api_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelList"];
+                };
+            };
+        };
+    };
+    sync_channels_api_channels_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelList"];
+                };
+            };
+        };
+    };
+    get_channel_api_channels__channel_id__get: {
+        parameters: {
+            query?: {
+                refresh?: boolean;
+            };
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelDetail"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    channel_avatar_api_channels__channel_id__avatar_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    channel_banner_api_channels__channel_id__banner_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    channel_video_thumbnail_api_channel_videos__youtube_id__thumbnail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                youtube_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             422: {

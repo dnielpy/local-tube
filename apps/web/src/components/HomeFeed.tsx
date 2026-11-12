@@ -17,7 +17,10 @@ const GRID =
 export function HomeFeed() {
   use(browser("Library data is fetched from the api in the browser."));
   const channel = useSearchParams().get("channel") ?? undefined;
-  const channels = useQuery({ queryKey: queryKeys.channels, queryFn: api.channels });
+  const channels = useQuery({
+    queryKey: queryKeys.downloadedChannels,
+    queryFn: api.downloadedChannels,
+  });
   const videos = useQuery({
     queryKey: queryKeys.videos({ channel }),
     queryFn: () => api.videos({ channel, limit: 200 }),

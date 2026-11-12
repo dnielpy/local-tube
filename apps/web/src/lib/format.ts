@@ -34,6 +34,21 @@ export function formatDate(iso: string): string {
   });
 }
 
+const compact = new Intl.NumberFormat("es", {
+  notation: "compact",
+  maximumFractionDigits: 2,
+});
+
+export function formatCount(value: number | null | undefined, noun: string): string | null {
+  if (value == null) return null;
+  return `${compact.format(value)} de ${noun}`;
+}
+
+export function channelHref(channel: { channel_id?: string | null; channel?: string | null }) {
+  if (channel.channel_id) return `/channel/${channel.channel_id}`;
+  return `/?channel=${encodeURIComponent(channel.channel ?? "")}`;
+}
+
 export function formatBytes(bytes: number | null | undefined): string | null {
   if (!bytes) return null;
   const units = ["B", "KB", "MB", "GB", "TB"];

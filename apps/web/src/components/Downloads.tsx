@@ -29,6 +29,8 @@ export function Downloads() {
     if (finished > seen.current) {
       client.invalidateQueries({ queryKey: queryKeys.allVideos });
       client.invalidateQueries({ queryKey: queryKeys.channels });
+      client.invalidateQueries({ queryKey: queryKeys.downloadedChannels });
+      client.invalidateQueries({ queryKey: queryKeys.allChannels });
     }
     seen.current = finished;
   }, [finished, client]);

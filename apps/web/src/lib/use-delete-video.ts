@@ -11,6 +11,8 @@ export function useDeleteVideo(onDeleted?: () => void) {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.allVideos });
       client.invalidateQueries({ queryKey: queryKeys.channels });
+      client.invalidateQueries({ queryKey: queryKeys.downloadedChannels });
+      client.invalidateQueries({ queryKey: queryKeys.allChannels });
       onDeleted?.();
     },
   });

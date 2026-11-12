@@ -3,15 +3,24 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, use, useEffect, type ComponentType, type SVGProps } from "react";
+import { Suspense, use, useEffect, useState, type ComponentType, type SVGProps } from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys } from "@/lib/api";
-
-import { ChannelAvatar } from "./ChannelAvatar";
+import { channelHref } from "@/lib/format";
 import {
+  useOnline,
+  useRefetchOnStatusChange,
+  useSetForcedOffline,
+  useStatus,
+} from "@/lib/use-status";
+
+import { ChannelPhoto } from "./ChannelPhoto";
+import {
+  CollapseIcon,
   DownloadFilledIcon,
   DownloadIcon,
+  ExpandIcon,
   HomeFilledIcon,
   HomeIcon,
   Logo,
@@ -31,24 +40,113 @@ function useActive() {
   return (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 }
 
-function GuideChannels() {
-  use(browser("Channels are fetched from the api in the browser."));
-  const channels = useQuery({ queryKey: queryKeys.channels, queryFn: api.channels });
-  if (!channels.data || channels.data.length === 0) return null;
+const VISIBLE_CHANNELS = 7;
+
+function GuideStatus() {
+  use(browser("The online status comes from the api."));
+  useRefetchOnStatusChange();
+  const status = useStatus();
+  const setForcedOffline = useSetForcedOffline();
+  const online = status.data?.online ?? false;
+  const forced = status.data?.forced_offline ?? false;
+  const detail = forced
+    ? "Modo sin conexión activado"
+    : online
+      ? "Conectado a YouTube"
+      : "YouTube no responde";
+
   return (
     <section className="border-b border-yt-divider px-3 py-3">
-      <h3 className="px-3 pt-[6px] pb-1 text-base font-medium">Canales</h3>
-      {channels.data.map((channel) => (
+      <div className="flex items-center gap-6 px-3 py-2">
+        <span className="flex size-6 items-center justify-center">
+          <span
+            className={`size-[10px] rounded-full ${online ? "bg-[#2ba640]" : "bg-[#717171]"}`}
+          />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{online ? "En línea" : "Sin conexión"}</p>
+          <p className="truncate text-xs text-yt-text-secondary">{detail}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={forced}
+        disabled={!status.data || setForcedOffline.isPending}
+        onClick={() => setForcedOffline.mutate(!forced)}
+        className="flex h-10 w-full items-center justify-between rounded-[10px] px-3 text-sm hover:bg-yt-surface disabled:opacity-50"
+      >
+        <span>Modo sin conexión</span>
+        <span
+          className={`relative h-[14px] w-9 rounded-full transition-colors ${
+            forced ? "bg-[#3ea6ff]/50" : "bg-[#717171]"
+          }`}
+        >
+          <span
+            className={`absolute top-1/2 size-5 -translate-y-1/2 rounded-full shadow transition-all ${
+              forced ? "left-4 bg-[#3ea6ff]" : "left-0 bg-[#f1f1f1]"
+            }`}
+          />
+        </span>
+      </button>
+    </section>
+  );
+}
+
+function GuideChannels() {
+  use(browser("Channels are fetched from the api in the browser."));
+  const [expanded, setExpanded] = useState(false);
+  const online = useOnline();
+  const channels = useQuery({
+    queryKey: queryKeys.channels,
+    queryFn: api.channels,
+    refetchInterval: (query) => (query.state.data?.syncing ? 3000 : false),
+  });
+  const items = channels.data?.items ?? [];
+  if (items.length === 0) return null;
+  const visible = expanded ? items : items.slice(0, VISIBLE_CHANNELS);
+  const subscriptions = online && items.some((channel) => channel.subscribed);
+
+  return (
+    <section className="border-b border-yt-divider px-3 py-3">
+      <h3 className="px-3 pt-[6px] pb-1 text-base font-medium">
+        {subscriptions ? "Suscripciones" : "Canales descargados"}
+      </h3>
+      {visible.map((channel) => (
         <Link
-          key={channel}
-          href={`/?channel=${encodeURIComponent(channel)}`}
+          key={channel.id ?? channel.name}
+          href={channelHref({ channel_id: channel.id, channel: channel.name })}
+          title={channel.name}
           className="flex h-10 items-center gap-6 rounded-[10px] px-3 hover:bg-yt-surface"
         >
-          <ChannelAvatar name={channel} size={24} />
-          <span className="truncate text-sm">{channel}</span>
+          <ChannelPhoto src={channel.avatar_url} name={channel.name} size={24} />
+          <span className="truncate text-sm">{channel.name}</span>
         </Link>
       ))}
+      {items.length > VISIBLE_CHANNELS && (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="flex h-10 w-full items-center gap-6 rounded-[10px] px-3 text-sm hover:bg-yt-surface"
+        >
+          {expanded ? <CollapseIcon /> : <ExpandIcon />}
+          {expanded ? "Mostrar menos" : `Mostrar ${items.length - VISIBLE_CHANNELS} más`}
+        </button>
+      )}
     </section>
+  );
+}
+
+function MiniStatusDot() {
+  use(browser("The online status comes from the api."));
+  const online = useOnline();
+  return (
+    <span
+      title={online ? "En línea" : "Sin conexión"}
+      className={`absolute top-3 right-4 size-2 rounded-full ring-2 ring-yt-bg ${
+        online ? "bg-[#2ba640]" : "bg-[#717171]"
+      }`}
+    />
   );
 }
 
@@ -76,6 +174,9 @@ function GuideContents() {
           );
         })}
       </section>
+      <Suspense>
+        <GuideStatus />
+      </Suspense>
       <Suspense>
         <GuideChannels />
       </Suspense>
@@ -109,8 +210,13 @@ export function MiniGuide({ className = "" }: { className?: string }) {
           <Link
             key={href}
             href={href}
-            className="flex h-[74px] w-16 flex-col items-center justify-center gap-[6px] rounded-[10px] pt-4 pb-[14px] hover:bg-yt-surface"
+            className="relative flex h-[74px] w-16 flex-col items-center justify-center gap-[6px] rounded-[10px] pt-4 pb-[14px] hover:bg-yt-surface"
           >
+            {href === "/" && (
+              <Suspense>
+                <MiniStatusDot />
+              </Suspense>
+            )}
             {active ? <ActiveIcon /> : <Icon />}
             <span className="max-w-full truncate text-[10px] leading-[14px]">{label}</span>
           </Link>

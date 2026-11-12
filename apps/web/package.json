@@ -7,7 +7,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "generate:api": "pnpm --dir ../api run --silent openapi > openapi.json && openapi-typescript openapi.json -o src/lib/api-types.ts && rm openapi.json"
+    "generate:api": "pnpm --dir ../api run --silent openapi > openapi.json && openapi-typescript openapi.json -o src/lib/api-types.ts && rm openapi.json && node scripts/strip-jsdoc.mjs src/lib/api-types.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.107.1",

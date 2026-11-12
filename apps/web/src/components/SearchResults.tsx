@@ -7,7 +7,7 @@ import { use } from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys, type Video } from "@/lib/api";
-import { timeAgo } from "@/lib/format";
+import { channelHref, timeAgo } from "@/lib/format";
 
 import { ChannelAvatar } from "./ChannelAvatar";
 import { SearchIcon } from "./icons";
@@ -72,7 +72,7 @@ function ResultRow({ video }: { video: Video }) {
         <p className="text-xs leading-[18px] text-yt-text-secondary">{timeAgo(video.created_at)}</p>
         {video.channel && (
           <Link
-            href={`/?channel=${encodeURIComponent(video.channel)}`}
+            href={channelHref(video)}
             className="flex items-center gap-2 py-3 text-xs text-yt-text-secondary hover:text-yt-text"
           >
             <ChannelAvatar name={video.channel} size={24} />

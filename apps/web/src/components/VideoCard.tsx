@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
 import type { Video } from "@/lib/api";
-import { timeAgo } from "@/lib/format";
+import { channelHref, timeAgo } from "@/lib/format";
 import { watchedFraction } from "@/lib/watch-progress";
 
 import { ChannelAvatar } from "./ChannelAvatar";
@@ -30,10 +30,7 @@ export function VideoCard({ video }: { video: Video }) {
         <Thumbnail video={video} progress={watched} />
       </Link>
       <div className="relative mt-3 flex gap-3 pr-6">
-        <Link
-          href={`/?channel=${encodeURIComponent(video.channel ?? "")}`}
-          aria-label={video.channel ?? undefined}
-        >
+        <Link href={channelHref(video)} aria-label={video.channel ?? undefined}>
           <ChannelAvatar name={video.channel} />
         </Link>
         <div className="min-w-0 flex-1">
@@ -47,10 +44,7 @@ export function VideoCard({ video }: { video: Video }) {
           </Link>
           <div className="mt-1 text-sm leading-5 text-yt-text-secondary">
             {video.channel && (
-              <Link
-                href={`/?channel=${encodeURIComponent(video.channel)}`}
-                className="block truncate hover:text-yt-text"
-              >
+              <Link href={channelHref(video)} className="block truncate hover:text-yt-text">
                 {video.channel}
               </Link>
             )}

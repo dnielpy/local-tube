@@ -4,6 +4,11 @@ export type Video = components["schemas"]["VideoOut"];
 export type VideoPage = components["schemas"]["VideoPage"];
 export type DownloadJob = components["schemas"]["DownloadJobOut"];
 export type JobStatus = DownloadJob["status"];
+export type Channel = components["schemas"]["ChannelOut"];
+export type ChannelList = components["schemas"]["ChannelList"];
+export type ChannelDetail = components["schemas"]["ChannelDetail"];
+export type RemoteVideo = components["schemas"]["RemoteVideoOut"];
+export type Status = components["schemas"]["StatusOut"];
 
 export class ApiError extends Error {
   constructor(
@@ -43,7 +48,17 @@ export const api = {
     const query = search.toString();
     return request<VideoPage>(`/videos${query ? `?${query}` : ""}`);
   },
-  channels: () => request<string[]>("/videos/channels"),
+  downloadedChannels: () => request<string[]>("/videos/channels"),
+  status: () => request<Status>("/status"),
+  setForcedOffline: (forcedOffline: boolean) =>
+    request<Status>("/status", {
+      method: "PUT",
+      body: JSON.stringify({ forced_offline: forcedOffline }),
+    }),
+  channels: () => request<ChannelList>("/channels"),
+  syncChannels: () => request<ChannelList>("/channels/sync", { method: "POST" }),
+  channel: (id: string, refresh = false) =>
+    request<ChannelDetail>(`/channels/${encodeURIComponent(id)}${refresh ? "?refresh=true" : ""}`),
   video: (id: string) => request<Video>(`/videos/${id}`),
   deleteVideo: (id: string) => request<void>(`/videos/${id}`, { method: "DELETE" }),
   downloads: () => request<DownloadJob[]>("/downloads"),
@@ -60,6 +75,10 @@ export const queryKeys = {
   videos: (params: object = {}) => ["videos", params] as const,
   allVideos: ["videos"] as const,
   channels: ["channels"] as const,
+  downloadedChannels: ["downloaded-channels"] as const,
+  status: ["status"] as const,
+  channel: (id: string) => ["channel", id] as const,
+  allChannels: ["channel"] as const,
   video: (id: string) => ["video", id] as const,
   downloads: ["downloads"] as const,
 };

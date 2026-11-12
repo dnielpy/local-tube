@@ -127,3 +127,5 @@ export function Logo() {
     </span>
   );
 }
+export const ExpandIcon = icon("m18 9.28-6.35 6.35-6.36-6.35.72-.71 5.64 5.65 5.65-5.65z");
+export const CollapseIcon = icon("M18.4 14.6 12 8.3l-6.4 6.3.8.7L12 9.7l5.6 5.6z");
