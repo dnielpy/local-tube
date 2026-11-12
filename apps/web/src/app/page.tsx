@@ -1,3 +1,11 @@
+import { Suspense } from "react";
+
+import { HomeFeed } from "@/components/HomeFeed";
+
 export default function HomePage() {
-  return null;
+  return (
+    <Suspense>
+      <HomeFeed />
+    </Suspense>
+  );
 }
