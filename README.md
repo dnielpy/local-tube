@@ -32,6 +32,8 @@ To create a profile, choose a name and a PIN, and then paste the YouTube cookies
 1. In a private/incognito window, log in to YouTube, open `https://www.youtube.com/robots.txt` in that same tab, and export the cookies for youtube.com in Netscape format, for example with the "Get cookies.txt LOCALLY" extension.
 2. Close the private window without logging out, so YouTube does not rotate those cookies.
 
+Do not copy them from your everyday browser: YouTube rotates the account cookies of every open YouTube tab, and a copy taken from a session that stays open stops working within minutes (yt-dlp then warns that "the provided YouTube account cookies are no longer valid"). A session exported this way and used only by LocalTube lasts weeks; yt-dlp keeps the cookies it renews in the profile's `cookies.txt`.
+
 LocalTube checks that the cookies hold a signed-in YouTube session, saves them in the `localtube-config` volume (`/config/profiles/<id>/cookies.txt`), takes the account's photo as the profile photo and syncs the subscriptions. yt-dlp uses them for that profile's downloads and subscriptions, and saves the cookies YouTube renews along the way. When they expire ("Sign in to confirm you're not a bot"), export them again and use "Actualizar cookies de YouTube" in the profile menu.
 
 The first profile created takes over the videos and downloads that existed before profiles.

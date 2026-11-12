@@ -22,13 +22,22 @@ export function CookiesField({
 
   return (
     <div className="w-full text-left">
-      <ol className="list-decimal space-y-1 pl-5 text-sm text-yt-text-secondary">
-        <li>Abre una ventana privada e inicia sesión en youtube.com con tu cuenta.</li>
+      <p className="text-sm text-yt-text-secondary">
+        No las copies de tu navegador normal: mientras YouTube esté abierto ahí, Google cambia las
+        cookies y las copiadas dejan de valer en minutos.
+      </p>
+      <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-yt-text-secondary">
+        <li>Abre una ventana privada nueva e inicia sesión en youtube.com.</li>
+        <li>
+          En esa misma pestaña ve a <span className="font-mono">youtube.com/robots.txt</span>.
+        </li>
         <li>
           Exporta las cookies de youtube.com en formato Netscape, por ejemplo con la extensión
           &quot;Get cookies.txt LOCALLY&quot;.
         </li>
-        <li>Cierra la ventana privada sin cerrar sesión, para que YouTube no las cambie.</li>
+        <li>
+          Cierra la ventana privada enseguida, sin cerrar sesión, y no vuelvas a abrir esa sesión.
+        </li>
       </ol>
       <textarea
         value={value}
