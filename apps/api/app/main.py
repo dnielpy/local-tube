@@ -9,6 +9,7 @@ from app.routers import channels, downloads, health, status, videos
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity, youtube_probe
 from app.services.downloader import YtDlpDownloader
+from app.services.image_cache import http_fetch
 from app.services.worker import DownloadWorker
 from app.services.youtube import YtDlpYouTubeClient
 
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             downloader,
             settings.download_concurrency,
             on_video_added=channel_service.ensure_channel_media,
+            fetch_image=http_fetch,
         )
         await worker.start()
         backfill = asyncio.create_task(

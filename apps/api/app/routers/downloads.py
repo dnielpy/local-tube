@@ -3,10 +3,12 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 
 from app.config import get_settings
 from app.db import SessionDep
+from app.media import media_path
 from app.models import DownloadJob, JobStatus, Video
 from app.schemas import DownloadCreate, DownloadJobOut, QualityOut, VideoFormatsOut
 from app.services.connectivity import connectivity
@@ -122,6 +124,16 @@ async def list_downloads(session: SessionDep) -> list[DownloadJob]:
 @router.get("/{job_id}", response_model=DownloadJobOut)
 async def get_download(session: SessionDep, job_id: uuid.UUID) -> DownloadJob:
     return await _get_job(session, job_id)
+
+
+@router.get("/{job_id}/thumbnail")
+async def download_thumbnail(session: SessionDep, job_id: uuid.UUID) -> FileResponse:
+    job = await _get_job(session, job_id)
+    if not job.thumbnail_path or not media_path(job.thumbnail_path).is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Thumbnail not cached")
+    return FileResponse(
+        media_path(job.thumbnail_path), headers={"Cache-Control": "public, max-age=604800"}
+    )
 
 
 @router.post("/{job_id}/retry", response_model=DownloadJobOut)

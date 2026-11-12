@@ -21,6 +21,7 @@ class Progress:
     percent: float | None = None
     speed: float | None = None
     eta: int | None = None
+    total_bytes: int | None = None
 
 
 @dataclass
@@ -229,10 +230,19 @@ def _progress_hook(on_progress: Callable[[Progress], None]) -> Callable[[dict[st
                 percent=min((finished + fraction) / parts, 1) * 100,
                 speed=d.get("speed"),
                 eta=d.get("eta"),
+                total_bytes=_total_size(d.get("info_dict", {})) or (int(total) if total else None),
             )
         )
 
     return hook
+
+
+def _total_size(info: dict[str, Any]) -> int | None:
+    parts = info.get("requested_formats") or []
+    sizes = [_size(part) for part in parts]
+    if not sizes or any(size is None for size in sizes):
+        return None
+    return sum(size for size in sizes if size is not None)
 
 
 def clean_error(exc: Exception) -> str:

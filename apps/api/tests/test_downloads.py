@@ -217,3 +217,26 @@ async def test_worker_caches_the_channel_before_completing(client, media_root):
 
     assert seen == [("UCuAXFkgsw1L7xaCfnd5JJOw", "downloading")]
     assert (await client.get(f"/api/downloads/{job['id']}")).json()["status"] == "completed"
+
+
+async def test_worker_caches_thumbnail_duration_and_size(client, media_root, fetch):
+    class SizedDownloader(FakeDownloader):
+        def probe(self, url: str) -> Probe:
+            probe = super().probe(url)
+            probe.info["duration"] = 213
+            return probe
+
+        def download(self, probe, on_progress, max_height=None):
+            on_progress(Progress("downloading", percent=10, total_bytes=12_600_000))
+            return super().download(probe, on_progress, max_height)
+
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+
+    await DownloadWorker(SizedDownloader(media_root), fetch_image=fetch).run_once()
+
+    done = (await client.get(f"/api/downloads/{job['id']}")).json()
+    assert done["duration_seconds"] == 213
+    assert done["size_bytes"] == 12_600_000
+    assert fetch.urls == ["https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"]
+    thumbnail = await client.get(done["thumbnail_url"])
+    assert thumbnail.status_code == 200

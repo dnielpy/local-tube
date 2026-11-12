@@ -81,9 +81,17 @@ class DownloadJobOut(BaseModel):
     error: str | None
     title: str | None
     max_height: int | None
+    duration_seconds: int | None
+    size_bytes: int | None
     video_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+    thumbnail_path: str | None = Field(default=None, exclude=True)
+
+    @computed_field
+    @property
+    def thumbnail_url(self) -> str | None:
+        return f"/api/downloads/{self.id}/thumbnail" if self.thumbnail_path else None
 
 
 class ChannelOut(BaseModel):

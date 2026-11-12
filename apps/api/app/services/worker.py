@@ -11,6 +11,8 @@ from app.db import SessionLocal
 from app.models import DownloadJob, JobStatus, Video
 from app.services.connectivity import connectivity
 from app.services.downloader import DownloadError, DownloadResult, Probe, Progress
+from app.services.image_cache import ImageFetcher, cache_image
+from app.services.youtube import video_thumbnail_url
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,9 @@ class DownloadWorker:
         downloader: Downloader,
         concurrency: int = 1,
         on_video_added: Callable[[str | None], Awaitable[None]] | None = None,
+        fetch_image: ImageFetcher | None = None,
     ) -> None:
+        self.fetch_image = fetch_image
         self.downloader = downloader
         self.concurrency = concurrency
         self.on_video_added = on_video_added
@@ -90,7 +94,20 @@ class DownloadWorker:
 
     async def _process(self, job_id: uuid.UUID, url: str, max_height: int | None) -> None:
         probe = await asyncio.to_thread(self.downloader.probe, url)
-        await _update_job(job_id, title=probe.title)
+        duration = probe.info.get("duration")
+        await _update_job(
+            job_id,
+            title=probe.title,
+            duration_seconds=int(duration) if duration else None,
+        )
+        if self.fetch_image is not None:
+            thumbnail = await cache_image(
+                video_thumbnail_url(probe.youtube_id),
+                "thumbnails",
+                probe.youtube_id,
+                self.fetch_image,
+            )
+            await _update_job(job_id, thumbnail_path=thumbnail)
 
         existing = await _find_video(probe.youtube_id)
         if existing is not None:
@@ -105,9 +122,8 @@ class DownloadWorker:
         )
         while not download.done():
             await asyncio.wait({download}, timeout=FLUSH_INTERVAL)
-            if latest:
-                await _write_progress(job_id, latest[-1])
-                latest.clear()
+            await _flush_progress(job_id, latest)
+        await _flush_progress(job_id, latest)
         result = download.result()
 
         if self.on_video_added is not None:
@@ -164,6 +180,16 @@ async def _find_video(youtube_id: str, session=None) -> Video | None:
         return await own.scalar(select(Video).where(Video.youtube_id == youtube_id))
 
 
+async def _flush_progress(job_id: uuid.UUID, pending: list[Progress]) -> None:
+    if not pending:
+        return
+    progress = pending[-1]
+    if not progress.total_bytes:
+        progress.total_bytes = next((p.total_bytes for p in pending if p.total_bytes), None)
+    pending.clear()
+    await _write_progress(job_id, progress)
+
+
 async def _write_progress(job_id: uuid.UUID, progress: Progress) -> None:
     if progress.status == "processing":
         await _update_job(job_id, status=JobStatus.processing, progress=100, speed=None, eta=None)
@@ -174,6 +200,8 @@ async def _write_progress(job_id: uuid.UUID, progress: Progress) -> None:
     }
     if progress.percent is not None:
         values["progress"] = round(progress.percent, 1)
+    if progress.total_bytes:
+        values["size_bytes"] = progress.total_bytes
     await _update_job(job_id, **values)
 
 
