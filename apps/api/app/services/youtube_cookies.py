@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import re
@@ -9,7 +8,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from http.cookiejar import MozillaCookieJar
-from pathlib import Path
 
 import httpx
 
@@ -52,42 +50,20 @@ INVALID_SESSION = (
 )
 
 
-def _selected_account(data: dict) -> Account | None:
-    sections = data["data"]["actions"][0]["getMultiPageMenuAction"]["menu"][
-        "multiPageMenuRenderer"
-    ]["sections"]
-    for section in sections:
-        for group in section.get("accountSectionListRenderer", {}).get("contents", []):
-            for entry in group.get("accountItemSectionRenderer", {}).get("contents", []):
-                item = entry.get("accountItem")
-                if item and item.get("isSelected"):
-                    photos = item.get("accountPhoto", {}).get("thumbnails") or [{}]
-                    return Account(
-                        logged_in=True,
-                        name=item.get("accountName", {}).get("simpleText"),
-                        avatar_url=photos[-1].get("url"),
-                    )
-    return None
-
-
 async def read_account(cookies_file: str) -> Account | None:
-    """Ask YouTube, with these cookies, whether they are signed in and as whom.
+    """Ask youtube.com, with these cookies, whether they are signed in and for the account photo.
 
-    None means YouTube could not be asked, so nothing is known about the session. Google
-    rotates some session cookies on every answer and may end the session when the old ones keep
-    being used, so the renewed cookies are written back to the file, as yt-dlp does.
+    None means YouTube could not be asked, so nothing is known about the session.
+
+    This makes a single request and never follows redirects or writes the cookies back. Any
+    other account page of YouTube can redirect to accounts.google.com's passive sign-in, and as
+    the exported cookies only cover youtube.com, Google answers there that nobody is signed in
+    and YouTube then ends the session for good.
     """
     jar = MozillaCookieJar(cookies_file)
     jar.load(ignore_discard=True, ignore_expires=True)
-    try:
-        return await _ask_youtube(jar)
-    finally:
-        jar.save(ignore_discard=True, ignore_expires=True)
-
-
-async def _ask_youtube(jar: MozillaCookieJar) -> Account | None:
     async with httpx.AsyncClient(
-        cookies=jar, headers={"User-Agent": USER_AGENT}, timeout=15, follow_redirects=True
+        cookies=jar, headers={"User-Agent": USER_AGENT}, timeout=15, follow_redirects=False
     ) as client:
         try:
             home = await client.get("https://www.youtube.com/")
@@ -95,18 +71,13 @@ async def _ask_youtube(jar: MozillaCookieJar) -> Account | None:
         except httpx.HTTPError as exc:
             logger.info("could not open youtube.com: %s", exc)
             return None
-        if '"LOGGED_IN":true' not in home.text:
-            return Account(logged_in=False)
-        try:
-            response = await client.get("https://www.youtube.com/getAccountSwitcherEndpoint")
-            response.raise_for_status()
-            account = _selected_account(json.loads(response.text.removeprefix(")]}'")))
-            if account:
-                return account
-        except (httpx.HTTPError, ValueError, LookupError, TypeError) as exc:
-            logger.info("the account switcher did not answer: %s", exc)
-        match = TOPBAR_AVATAR.search(home.text)
-        return Account(logged_in=True, avatar_url=match.group(1) if match else None)
+    if home.is_redirect:
+        logger.info("youtube.com redirected to %s", home.headers.get("location"))
+        return None
+    if '"LOGGED_IN":true' not in home.text:
+        return Account(logged_in=False)
+    match = TOPBAR_AVATAR.search(home.text)
+    return Account(logged_in=True, avatar_url=match.group(1) if match else None)
 
 
 def normalize(text: str) -> str:
@@ -179,9 +150,6 @@ class YouTubeCookies:
             with os.fdopen(handle, "w") as file:
                 file.write(text)
             account = await self.read(name)
-            # Keep the cookies YouTube renewed while answering, not the pasted ones.
-            if account is not None and account.logged_in:
-                text = normalize(await asyncio.to_thread(Path(name).read_text))
         except Exception:
             logger.exception("could not check the YouTube session")
             account = None

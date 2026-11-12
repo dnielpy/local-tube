@@ -265,15 +265,6 @@ async def test_bot_check_on_a_download_marks_the_cookies_expired(client, profile
     assert (await client.get("/api/session/cookies")).json()["cookies_valid"] is False
 
 
-async def test_profile_keeps_the_cookies_youtube_renewed_while_checking(anon_client, account):
-    account.renewed = ".youtube.com\tTRUE\t/\tTRUE\t0\t__Secure-1PSIDTS\tnew\n"
-
-    profile = (await create(anon_client)).json()
-
-    saved = Path(cookies_path(uuid.UUID(profile["id"]))).read_text()  # noqa: ASYNC240
-    assert "__Secure-1PSIDTS\tnew" in saved
-
-
 async def test_failed_subscription_sync_rechecks_the_cookies(
     anon_client, account, youtube, channel_service
 ):
@@ -289,3 +280,21 @@ async def test_failed_subscription_sync_rechecks_the_cookies(
     await channel_service.wait()
 
     assert (await anon_client.get("/api/session/cookies")).json()["cookies_valid"] is False
+
+
+async def test_failed_subscription_sync_is_not_retried_on_every_page(
+    client, youtube, channel_service
+):
+    def broken(cookies_file=None):
+        youtube.calls.append("subscriptions")
+        raise YouTubeError("channels: Failed to resolve url")
+
+    youtube.subscriptions = broken
+    for _ in range(3):
+        await client.get("/api/channels")
+        await channel_service.wait()
+
+    assert youtube.calls == ["subscriptions"]
+    await client.post("/api/channels/sync")
+    await channel_service.wait()
+    assert youtube.calls == ["subscriptions", "subscriptions"]

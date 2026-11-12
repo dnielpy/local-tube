@@ -19,6 +19,7 @@ from app.settings_store import read_setting, write_setting
 logger = logging.getLogger(__name__)
 
 SUBSCRIPTIONS_TTL = timedelta(hours=24)
+SYNC_RETRY = timedelta(minutes=15)
 CHANNEL_TTL = timedelta(hours=6)
 AVATAR_CONCURRENCY = 8
 PAGE_SIZE = 10
@@ -39,6 +40,10 @@ def _now() -> datetime:
 
 def _synced_key(profile_id: uuid.UUID) -> str:
     return f"{SUBSCRIPTIONS_SYNCED_KEY}:{profile_id}"
+
+
+def _failed_key(profile_id: uuid.UUID) -> str:
+    return f"subscriptions_failed_at:{profile_id}"
 
 
 def _subscriptions_task(profile_id: uuid.UUID) -> str:
@@ -71,6 +76,9 @@ class ChannelService:
             await asyncio.gather(*running, return_exceptions=True)
 
     async def subscriptions_stale(self, profile_id: uuid.UUID) -> bool:
+        failed = await read_setting(_failed_key(profile_id))
+        if failed and _now() - datetime.fromisoformat(failed) < SYNC_RETRY:
+            return False
         synced = await read_setting(_synced_key(profile_id))
         return not synced or _now() - datetime.fromisoformat(synced) >= SUBSCRIPTIONS_TTL
 
@@ -110,6 +118,8 @@ class ChannelService:
                 )
             except YouTubeError as exc:
                 logger.warning("could not sync the subscriptions of %s: %s", profile_id, exc)
+                # Do not ask YouTube again on every page load with an account it turned away.
+                await write_setting(_failed_key(profile_id), _now().isoformat())
                 # Usually the cookies stopped working: let the status show it soon.
                 await recheck_soon(profile_id)
                 return False

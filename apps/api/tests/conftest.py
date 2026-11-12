@@ -231,14 +231,9 @@ class FakeAccount:
             avatar_url="https://yt3.ggpht.com/photo=s88-c-k",
         )
         self.files: list[str] = []
-        # A cookie line YouTube "renews" while answering, written back like the real reader does.
-        self.renewed: str | None = None
 
     async def __call__(self, cookies_file: str) -> Account | None:
         self.files.append(cookies_file)
-        if self.renewed:
-            with open(cookies_file, "a") as file:  # noqa: ASYNC230
-                file.write(self.renewed)
         return self.account
 
 
