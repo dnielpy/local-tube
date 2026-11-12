@@ -1,3 +1,7 @@
+# Its own project name, so it never touches the containers of docker-compose.dev.yml,
+# which lives in the same folder.
+name: localtube
+
 services:
   postgres:
     image: postgres:17-alpine
