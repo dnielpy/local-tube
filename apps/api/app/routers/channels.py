@@ -1,15 +1,24 @@
+from collections.abc import Iterable
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 
 from app.db import SessionDep
 from app.media import media_path
 from app.models import Channel, ChannelVideo, Video
-from app.schemas import ChannelDetail, ChannelList, ChannelOut, RemoteVideoOut, VideoOut
-from app.services.channels import ChannelService
+from app.schemas import (
+    ChannelDetail,
+    ChannelList,
+    ChannelOut,
+    RemoteVideoOut,
+    RemoteVideoPage,
+    VideoOut,
+)
+from app.services.channels import PAGE_SIZE, ChannelService
 from app.services.connectivity import connectivity
+from app.services.youtube import YouTubeError
 
 router = APIRouter(tags=["channels"])
 
@@ -104,6 +113,38 @@ async def sync_channels(session: SessionDep, service: ServiceDep) -> ChannelList
     return await _channel_list(session, syncing)
 
 
+async def _remote_videos(
+    session: SessionDep, videos: Iterable[ChannelVideo]
+) -> list[RemoteVideoOut]:
+    remote = list(videos)
+    local = dict(
+        (
+            await session.execute(
+                select(Video.youtube_id, Video.id).where(
+                    Video.youtube_id.in_([video.youtube_id for video in remote])
+                )
+            )
+        ).all()
+    )
+    return [
+        RemoteVideoOut(
+            youtube_id=video.youtube_id,
+            title=video.title,
+            duration_seconds=video.duration_seconds,
+            view_count=video.view_count,
+            published_at=video.published_at,
+            thumbnail_url=(
+                f"/api/channel-videos/{video.youtube_id}/thumbnail"
+                if video.thumbnail_path
+                else None
+            ),
+            youtube_url=f"https://www.youtube.com/watch?v={video.youtube_id}",
+            video_id=local.get(video.youtube_id),
+        )
+        for video in remote
+    ]
+
+
 @router.get("/channels/{channel_id}", response_model=ChannelDetail)
 async def get_channel(
     channel_id: str, session: SessionDep, service: ServiceDep, refresh: bool = False
@@ -123,39 +164,14 @@ async def get_channel(
 
     latest: list[RemoteVideoOut] = []
     if connectivity.online and channel is not None:
-        remote = list(
+        latest = await _remote_videos(
+            session,
             await session.scalars(
                 select(ChannelVideo)
                 .where(ChannelVideo.channel_id == channel_id)
                 .order_by(ChannelVideo.position)
-            )
+            ),
         )
-        local = dict(
-            (
-                await session.execute(
-                    select(Video.youtube_id, Video.id).where(
-                        Video.youtube_id.in_([video.youtube_id for video in remote])
-                    )
-                )
-            ).all()
-        )
-        latest = [
-            RemoteVideoOut(
-                youtube_id=video.youtube_id,
-                title=video.title,
-                duration_seconds=video.duration_seconds,
-                view_count=video.view_count,
-                published_at=video.published_at,
-                thumbnail_url=(
-                    f"/api/channel-videos/{video.youtube_id}/thumbnail"
-                    if video.thumbnail_path
-                    else None
-                ),
-                youtube_url=f"https://www.youtube.com/watch?v={video.youtube_id}",
-                video_id=local.get(video.youtube_id),
-            )
-            for video in remote
-        ]
 
     return ChannelDetail(
         id=channel_id,
@@ -182,6 +198,33 @@ async def get_channel(
         latest_fetched_at=channel.videos_fetched_at if channel else None,
         downloaded=[VideoOut.model_validate(video) for video in downloaded],
     )
+
+
+@router.get("/channels/{channel_id}/videos", response_model=RemoteVideoPage)
+async def channel_videos(
+    channel_id: str,
+    session: SessionDep,
+    service: ServiceDep,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> RemoteVideoPage:
+    if not connectivity.online:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, {"message": "Sin conexión"})
+    if await session.get(Channel, channel_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Channel not found")
+    try:
+        has_more = await service.load_videos(channel_id, offset)
+    except YouTubeError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, {"message": str(exc)}) from exc
+    items = await _remote_videos(
+        session,
+        await session.scalars(
+            select(ChannelVideo)
+            .where(ChannelVideo.channel_id == channel_id, ChannelVideo.position >= offset)
+            .order_by(ChannelVideo.position)
+            .limit(PAGE_SIZE)
+        ),
+    )
+    return RemoteVideoPage(items=items, has_more=has_more)
 
 
 def _cached_file(relative: str | None) -> FileResponse:

@@ -14,9 +14,11 @@ import { ChannelPhoto } from "./ChannelPhoto";
 import { GRID, GridSkeleton } from "./HomeFeed";
 import { CheckIcon, ExternalIcon, RetryIcon } from "./icons";
 import { RemoteVideoCard } from "./RemoteVideoCard";
-import { VideoCard } from "./VideoCard";
+import { VideoCard, VideoCardSkeleton } from "./VideoCard";
 
 type Tab = "videos" | "downloaded";
+
+const PAGE_SIZE = 10;
 
 export function ChannelView() {
   use(browser("Channel data is fetched from the api in the browser."));
@@ -223,6 +225,7 @@ function ChannelPage({
                   <RemoteVideoCard key={video.youtube_id} video={video} channelId={data.id} />
                 ))}
               </div>
+              <MoreVideos data={data} />
             </>
           ) : refreshing ? (
             <GridSkeleton />
@@ -243,6 +246,67 @@ function ChannelPage({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function MoreVideos({ data }: { data: ChannelDetail }) {
+  const client = useQueryClient();
+  const loaded = data.latest.length;
+  const [exhaustedAt, setExhaustedAt] = useState<number | null>(null);
+  const more = useMutation({
+    mutationFn: () => api.channelVideos(data.id, loaded),
+    onSuccess: (page) => {
+      if (!page.has_more) setExhaustedAt(loaded + page.items.length);
+      client.setQueryData<ChannelDetail>(queryKeys.channel(data.id), (current) => {
+        if (!current) return current;
+        const known = new Set(current.latest.map((video) => video.youtube_id));
+        const added = page.items.filter((video) => !known.has(video.youtube_id));
+        return { ...current, latest: [...current.latest, ...added] };
+      });
+    },
+  });
+  const hasMore = loaded >= PAGE_SIZE && exhaustedAt !== loaded;
+  const sentinel = useRef<HTMLDivElement>(null);
+  const { mutate, isPending, isError } = more;
+
+  useEffect(() => {
+    const element = sentinel.current;
+    if (!element || !hasMore || isPending || isError) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) mutate();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasMore, isPending, isError, loaded, mutate]);
+
+  if (!hasMore) return null;
+  return (
+    <div ref={sentinel} className="mt-10">
+      {isError ? (
+        <div className="flex flex-col items-center gap-3 py-6 text-sm text-yt-text-secondary">
+          <p>No se pudieron cargar más videos.</p>
+          <button
+            type="button"
+            onClick={() => mutate()}
+            className="flex h-9 items-center gap-[6px] rounded-full bg-yt-surface px-4 font-medium text-yt-text hover:bg-yt-surface-hover"
+          >
+            <RetryIcon size={20} />
+            Reintentar
+          </button>
+        </div>
+      ) : (
+        isPending && (
+          <div className={GRID}>
+            {Array.from({ length: PAGE_SIZE }, (_, index) => (
+              <VideoCardSkeleton key={index} />
+            ))}
+          </div>
+        )
+      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { api, queryKeys, type DownloadJob, type RemoteVideo } from "@/lib/api";
 import { formatCount, formatDuration, timeAgo } from "@/lib/format";
 import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
-import { CheckIcon, DownloadIcon, ExternalIcon, RetryIcon } from "./icons";
+import { CheckIcon, DownloadIcon, ExternalIcon, RetryIcon, StopFilledIcon } from "./icons";
 import { QualityDialog } from "./QualityDialog";
 
 function jobLabel(job: DownloadJob): string {
@@ -27,6 +27,10 @@ export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; chan
   const [choosing, setChoosing] = useState(false);
   const retry = useMutation({
     mutationFn: (id: string) => api.retryDownload(id),
+    onSettled: () => client.invalidateQueries({ queryKey: queryKeys.downloads }),
+  });
+  const cancel = useMutation({
+    mutationFn: (id: string) => api.cancelDownload(id),
     onSettled: () => client.invalidateQueries({ queryKey: queryKeys.downloads }),
   });
 
@@ -105,9 +109,20 @@ export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; chan
                 Ver
               </a>
               {active ? (
-                <span className={`${pill} bg-yt-surface text-yt-text-secondary`}>
-                  {jobLabel(job)}
-                </span>
+                <>
+                  <span className={`${pill} bg-yt-surface text-yt-text-secondary`}>
+                    {cancel.isPending || cancel.isSuccess ? "Parando…" : jobLabel(job)}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={cancel.isPending || cancel.isSuccess}
+                    onClick={() => cancel.mutate(job.id)}
+                    className={`${pill} bg-yt-surface hover:bg-yt-surface-hover disabled:opacity-50`}
+                  >
+                    <StopFilledIcon size={16} />
+                    Parar
+                  </button>
+                </>
               ) : job?.status === "failed" ? (
                 <button
                   type="button"

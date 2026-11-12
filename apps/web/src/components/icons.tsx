@@ -129,3 +129,5 @@ export function Logo() {
 }
 export const ExpandIcon = icon("m18 9.28-6.35 6.35-6.36-6.35.72-.71 5.64 5.65 5.65-5.65z");
 export const CollapseIcon = icon("M18.4 14.6 12 8.3l-6.4 6.3.8.7L12 9.7l5.6 5.6z");
+export const StopIcon = icon("M18 6v12H6V6h12m1-1H5v14h14V5z");
+export const StopFilledIcon = icon("M6 6h12v12H6z");

@@ -8,6 +8,7 @@ export type Channel = components["schemas"]["ChannelOut"];
 export type ChannelList = components["schemas"]["ChannelList"];
 export type ChannelDetail = components["schemas"]["ChannelDetail"];
 export type RemoteVideo = components["schemas"]["RemoteVideoOut"];
+export type RemoteVideoPage = components["schemas"]["RemoteVideoPage"];
 export type Status = components["schemas"]["StatusOut"];
 export type VideoFormats = components["schemas"]["VideoFormatsOut"];
 
@@ -60,6 +61,8 @@ export const api = {
   syncChannels: () => request<ChannelList>("/channels/sync", { method: "POST" }),
   channel: (id: string, refresh = false) =>
     request<ChannelDetail>(`/channels/${encodeURIComponent(id)}${refresh ? "?refresh=true" : ""}`),
+  channelVideos: (id: string, offset: number) =>
+    request<RemoteVideoPage>(`/channels/${encodeURIComponent(id)}/videos?offset=${offset}`),
   video: (id: string) => request<Video>(`/videos/${id}`),
   deleteVideo: (id: string) => request<void>(`/videos/${id}`, { method: "DELETE" }),
   downloads: () => request<DownloadJob[]>("/downloads"),
@@ -70,6 +73,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url, max_height: maxHeight }),
     }),
+  cancelDownload: (id: string) =>
+    request<DownloadJob>(`/downloads/${id}/cancel`, { method: "POST" }),
   retryDownload: (id: string) => request<DownloadJob>(`/downloads/${id}/retry`, { method: "POST" }),
   deleteDownload: (id: string) => request<void>(`/downloads/${id}`, { method: "DELETE" }),
 };

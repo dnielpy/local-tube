@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 SUBSCRIPTIONS_TTL = timedelta(hours=24)
 CHANNEL_TTL = timedelta(hours=6)
 AVATAR_CONCURRENCY = 8
+PAGE_SIZE = 10
 MEDIA_RETRY = timedelta(hours=1)
 MEDIA_SWEEP_INTERVAL = 600
 SUBSCRIPTIONS_SYNCED_KEY = "subscriptions_synced_at"
@@ -26,7 +27,7 @@ SUBSCRIPTIONS_SYNCED_KEY = "subscriptions_synced_at"
 class YouTubeClient(Protocol):
     def subscriptions(self) -> list[RemoteChannel]: ...
 
-    def channel(self, channel_id: str, limit: int = 10) -> ChannelPage: ...
+    def channel(self, channel_id: str, limit: int = 10, start: int = 0) -> ChannelPage: ...
 
 
 def _now() -> datetime:
@@ -139,6 +140,45 @@ class ChannelService:
                 return False
             await self._store_page(channel_id, page)
             return True
+
+    async def load_videos(self, channel_id: str, offset: int) -> bool:
+        """Cache the page of channel videos starting at offset and say if more follow."""
+        async with self._lock(channel_id), SessionLocal() as session:
+            stored = {
+                video.youtube_id: video.position
+                for video in await session.scalars(
+                    select(ChannelVideo).where(ChannelVideo.channel_id == channel_id)
+                )
+            }
+            if sum(position >= offset for position in stored.values()) >= PAGE_SIZE:
+                return True
+            page = await asyncio.to_thread(self.client.channel, channel_id, PAGE_SIZE, offset)
+            new = [
+                (offset + index, video)
+                for index, video in enumerate(page.videos)
+                if video.youtube_id not in stored
+            ]
+            thumbnails = await asyncio.gather(
+                *(
+                    cache_image(video.thumbnail_url, "thumbnails", video.youtube_id, self.fetch)
+                    for _, video in new
+                )
+            )
+            for (position, video), thumbnail in zip(new, thumbnails, strict=True):
+                session.add(
+                    ChannelVideo(
+                        youtube_id=video.youtube_id,
+                        channel_id=channel_id,
+                        title=video.title,
+                        duration_seconds=video.duration_seconds,
+                        view_count=video.view_count,
+                        published_at=video.published_at,
+                        thumbnail_path=thumbnail,
+                        position=position,
+                    )
+                )
+            await session.commit()
+            return len(page.videos) == PAGE_SIZE
 
     async def needs_media(self, channel_id: str) -> bool:
         async with SessionLocal() as session:

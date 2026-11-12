@@ -136,6 +136,71 @@ async def test_channel_page_offline_uses_cache_without_latest(client, youtube, c
     assert (await client.get(body["avatar_url"])).status_code == 200
 
 
+def with_videos(youtube, count):
+    from app.services.youtube import RemoteVideo
+
+    youtube.pages["UCaaa"].videos = [
+        RemoteVideo(
+            youtube_id=f"vid{i}",
+            title=f"Video {i}",
+            duration_seconds=60,
+            view_count=100,
+            published_at=None,
+            thumbnail_url=f"https://i.ytimg.com/vi/vid{i}/mqdefault.jpg",
+        )
+        for i in range(count)
+    ]
+
+
+async def test_channel_videos_load_the_next_pages(client, youtube, make_video, channel_service):
+    with_videos(youtube, 25)
+    await make_video("vid12", channel="Alpha", channel_id="UCaaa")
+    _, first = await get_channel(client, channel_service, "UCaaa")
+    assert len(first.json()["latest"]) == 10
+
+    second = (await client.get("/api/channels/UCaaa/videos", params={"offset": 10})).json()
+    third = (await client.get("/api/channels/UCaaa/videos", params={"offset": 20})).json()
+
+    assert [v["youtube_id"] for v in second["items"]] == [f"vid{i}" for i in range(10, 20)]
+    assert second["has_more"] is True
+    assert second["items"][2]["video_id"] is not None
+    assert (await client.get(second["items"][0]["thumbnail_url"])).status_code == 200
+    assert [v["youtube_id"] for v in third["items"]] == [f"vid{i}" for i in range(20, 25)]
+    assert third["has_more"] is False
+    latest = (await client.get("/api/channels/UCaaa")).json()["latest"]
+    assert [v["youtube_id"] for v in latest] == [f"vid{i}" for i in range(25)]
+
+
+async def test_channel_videos_already_loaded_are_not_refetched(client, youtube, channel_service):
+    with_videos(youtube, 25)
+    await get_channel(client, channel_service, "UCaaa")
+
+    await client.get("/api/channels/UCaaa/videos", params={"offset": 10})
+    again = (await client.get("/api/channels/UCaaa/videos", params={"offset": 10})).json()
+
+    assert youtube.calls == ["channel:UCaaa", "channel:UCaaa@10"]
+    assert len(again["items"]) == 10
+
+
+async def test_channel_refresh_drops_the_extra_pages(client, youtube, channel_service):
+    with_videos(youtube, 25)
+    await get_channel(client, channel_service, "UCaaa")
+    await client.get("/api/channels/UCaaa/videos", params={"offset": 10})
+
+    _, refreshed = await get_channel(client, channel_service, "UCaaa", refresh=True)
+
+    assert len(refreshed.json()["latest"]) == 10
+
+
+async def test_channel_videos_need_a_connection(client, channel_service):
+    await get_channel(client, channel_service, "UCaaa")
+    connectivity.forced_offline = True
+
+    response = await client.get("/api/channels/UCaaa/videos", params={"offset": 10})
+
+    assert response.status_code == 503
+
+
 async def test_offline_channel_refresh_is_rejected(client):
     connectivity.forced_offline = True
     response = await client.get("/api/channels/UCaaa", params={"refresh": True})

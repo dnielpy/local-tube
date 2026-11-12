@@ -96,11 +96,12 @@ class YtDlpYouTubeClient:
             )
         return channels
 
-    def channel(self, channel_id: str, limit: int = 10) -> ChannelPage:
+    def channel(self, channel_id: str, limit: int = 10, start: int = 0) -> ChannelPage:
         info = self._extract(
             f"https://www.youtube.com/channel/{channel_id}/videos",
             extract_flat="in_playlist",
-            playlistend=limit,
+            playliststart=start + 1,
+            playlistend=start + limit,
             extractor_args={"youtubetab": {"approximate_date": [""]}},
         )
         thumbnails = info.get("thumbnails")

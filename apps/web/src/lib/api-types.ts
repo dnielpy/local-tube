@@ -176,6 +176,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/downloads/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_download_api_downloads__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -232,6 +248,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["get_channel_api_channels__channel_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/channels/{channel_id}/videos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["channel_videos_api_channels__channel_id__videos_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -346,7 +378,7 @@ export interface components {
         HTTPValidationError: {
             detail?: components["schemas"]["ValidationError"][];
         };
-        JobStatus: "queued" | "downloading" | "processing" | "completed" | "failed";
+        JobStatus: "queued" | "downloading" | "processing" | "completed" | "failed" | "cancelled";
         QualityOut: {
             height: number;
             size_bytes: number | null;
@@ -360,6 +392,10 @@ export interface components {
             thumbnail_url: string | null;
             youtube_url: string;
             video_id?: string | null;
+        };
+        RemoteVideoPage: {
+            items: components["schemas"]["RemoteVideoOut"][];
+            has_more: boolean;
         };
         StatusOut: {
             online: boolean;
@@ -794,6 +830,35 @@ export interface operations {
             };
         };
     };
+    cancel_download_api_downloads__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadJobOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_status_api_status_get: {
         parameters: {
             query?: never;
@@ -901,6 +966,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChannelDetail"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    channel_videos_api_channels__channel_id__videos_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteVideoPage"];
                 };
             };
             422: {

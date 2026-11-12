@@ -11,7 +11,16 @@ import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
 import { IconButton } from "./IconButton";
 import { QualityDialog } from "./QualityDialog";
-import { AlertIcon, CheckIcon, CloseIcon, DownloadIcon, RetryIcon, TrashIcon } from "./icons";
+import {
+  AlertIcon,
+  CheckIcon,
+  CloseIcon,
+  DownloadIcon,
+  RetryIcon,
+  StopFilledIcon,
+  StopIcon,
+  TrashIcon,
+} from "./icons";
 
 export function Downloads() {
   use(browser("Library data is fetched from the api in the browser."));
@@ -141,6 +150,7 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   processing: "Procesando",
   completed: "Completado",
   failed: "Error",
+  cancelled: "Cancelada",
 };
 
 function JobRow({ job }: { job: DownloadJob }) {
@@ -148,6 +158,7 @@ function JobRow({ job }: { job: DownloadJob }) {
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.downloads });
   const retry = useMutation({ mutationFn: api.retryDownload, onSuccess: refresh });
   const remove = useMutation({ mutationFn: api.deleteDownload, onSuccess: refresh });
+  const cancel = useMutation({ mutationFn: api.cancelDownload, onSuccess: refresh });
   const active = isActiveJob(job);
   const watchHref = job.video_id ? `/watch?v=${job.video_id}` : null;
 
@@ -182,7 +193,11 @@ function JobRow({ job }: { job: DownloadJob }) {
       )}
       {active && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <ProgressCircle job={job} />
+          <ProgressCircle
+            job={job}
+            stopping={cancel.isPending || cancel.isSuccess}
+            onStop={() => cancel.mutate(job.id)}
+          />
         </div>
       )}
       {job.status === "failed" && image && (
@@ -198,7 +213,10 @@ function JobRow({ job }: { job: DownloadJob }) {
     </div>
   );
 
-  const details = [STATUS_LABEL[job.status], job.max_height ? `${job.max_height}p` : "Máxima"];
+  const details = [
+    active && (cancel.isPending || cancel.isSuccess) ? "Parando…" : STATUS_LABEL[job.status],
+    job.max_height ? `${job.max_height}p` : "Máxima",
+  ];
   if (job.status === "downloading") {
     details.push(`${Math.round(job.progress)}%`);
     if (job.speed) details.push(job.speed);
@@ -244,7 +262,16 @@ function JobRow({ job }: { job: DownloadJob }) {
         </p>
       </div>
       <div className="flex shrink-0 items-center">
-        {job.status === "failed" && (
+        {active && (
+          <IconButton
+            label="Parar descarga"
+            disabled={cancel.isPending || cancel.isSuccess}
+            onClick={() => cancel.mutate(job.id)}
+          >
+            <StopIcon />
+          </IconButton>
+        )}
+        {(job.status === "failed" || job.status === "cancelled") && (
           <IconButton
             label="Reintentar"
             disabled={retry.isPending}
@@ -253,7 +280,7 @@ function JobRow({ job }: { job: DownloadJob }) {
             <RetryIcon />
           </IconButton>
         )}
-        {job.status !== "downloading" && job.status !== "processing" && (
+        {!active && (
           <IconButton
             label="Quitar del historial"
             disabled={remove.isPending}
@@ -272,17 +299,29 @@ const RING_STROKE = 3;
 const RING_RADIUS = (RING - RING_STROKE) / 2;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
-function ProgressCircle({ job }: { job: DownloadJob }) {
+function ProgressCircle({
+  job,
+  stopping,
+  onStop,
+}: {
+  job: DownloadJob;
+  stopping: boolean;
+  onStop: () => void;
+}) {
   const indeterminate = job.status !== "downloading" || job.progress <= 0;
   const progress = Math.min(Math.max(job.progress, 0), 100);
   return (
-    <div
-      className="relative flex size-11 items-center justify-center"
-      role="progressbar"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={indeterminate ? undefined : Math.round(progress)}
-      aria-label="Progreso de la descarga"
+    <button
+      type="button"
+      onClick={onStop}
+      disabled={stopping}
+      title={stopping ? "Parando…" : "Parar descarga"}
+      aria-label={
+        stopping
+          ? "Parando la descarga"
+          : `Parar descarga${indeterminate ? "" : `, ${Math.round(progress)}%`}`
+      }
+      className="group/stop relative flex size-11 items-center justify-center disabled:opacity-70"
     >
       <svg
         viewBox={`0 0 ${RING} ${RING}`}
@@ -310,11 +349,18 @@ function ProgressCircle({ job }: { job: DownloadJob }) {
           className="transition-[stroke-dashoffset] duration-700 ease-out"
         />
       </svg>
-      <span className="flex size-8 items-center justify-center rounded-full bg-[#3ea6ff] text-white shadow-md">
-        <span className={job.status === "downloading" ? "animate-lt-nudge" : ""}>
+      <span className="flex size-8 items-center justify-center rounded-full bg-[#3ea6ff] text-white shadow-md transition-colors group-hover/stop:bg-[#cc0000] group-disabled/stop:bg-[#717171]">
+        <span
+          className={`group-hover/stop:hidden group-disabled/stop:hidden ${
+            job.status === "downloading" ? "animate-lt-nudge" : ""
+          }`}
+        >
           <DownloadIcon size={20} />
         </span>
+        <span className="hidden group-hover/stop:block group-disabled/stop:block">
+          <StopFilledIcon size={16} />
+        </span>
       </span>
-    </div>
+    </button>
   );
 }

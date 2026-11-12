@@ -124,9 +124,12 @@ class FakeYouTube:
         self.calls.append("subscriptions")
         return self.subs
 
-    def channel(self, channel_id, limit=10):
-        self.calls.append(f"channel:{channel_id}")
-        return self.pages[channel_id]
+    def channel(self, channel_id, limit=10, start=0):
+        from app.services.youtube import ChannelPage
+
+        self.calls.append(f"channel:{channel_id}" + (f"@{start}" if start else ""))
+        page = self.pages[channel_id]
+        return ChannelPage(channel=page.channel, videos=page.videos[start : start + limit])
 
 
 class FakeFetch:

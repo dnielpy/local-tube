@@ -119,6 +119,11 @@ class RemoteVideoOut(BaseModel):
     video_id: uuid.UUID | None = None
 
 
+class RemoteVideoPage(BaseModel):
+    items: list[RemoteVideoOut]
+    has_more: bool
+
+
 class ChannelDetail(BaseModel):
     id: str
     known: bool
