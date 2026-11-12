@@ -7,7 +7,7 @@ import type { Video } from "@/lib/api";
 import { channelHref, timeAgo } from "@/lib/format";
 import { watchedFraction } from "@/lib/watch-progress";
 
-import { ChannelAvatar } from "./ChannelAvatar";
+import { ChannelPhoto } from "./ChannelPhoto";
 import { Thumbnail } from "./Thumbnail";
 import { VideoMenu } from "./VideoMenu";
 
@@ -31,7 +31,7 @@ export function VideoCard({ video }: { video: Video }) {
       </Link>
       <div className="relative mt-3 flex gap-3 pr-6">
         <Link href={channelHref(video)} aria-label={video.channel ?? undefined}>
-          <ChannelAvatar name={video.channel} />
+          <ChannelPhoto src={video.channel_avatar_url} name={video.channel} />
         </Link>
         <div className="min-w-0 flex-1">
           <Link href={href}>

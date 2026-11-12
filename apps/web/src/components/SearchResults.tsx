@@ -9,7 +9,7 @@ import { browser } from "react-dom";
 import { api, queryKeys, type Video } from "@/lib/api";
 import { channelHref, timeAgo } from "@/lib/format";
 
-import { ChannelAvatar } from "./ChannelAvatar";
+import { ChannelPhoto } from "./ChannelPhoto";
 import { SearchIcon } from "./icons";
 import { Thumbnail } from "./Thumbnail";
 import { useWatchedFraction } from "./VideoCard";
@@ -75,7 +75,7 @@ function ResultRow({ video }: { video: Video }) {
             href={channelHref(video)}
             className="flex items-center gap-2 py-3 text-xs text-yt-text-secondary hover:text-yt-text"
           >
-            <ChannelAvatar name={video.channel} size={24} />
+            <ChannelPhoto src={video.channel_avatar_url} name={video.channel} size={24} />
             {video.channel}
           </Link>
         )}

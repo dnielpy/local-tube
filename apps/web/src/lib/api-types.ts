@@ -375,6 +375,7 @@ export interface components {
             youtube_url: string;
             channel: string | null;
             channel_id: string | null;
+            channel_avatar_url?: string | null;
             duration_seconds: number | null;
             file_size: number | null;
             created_at: string;

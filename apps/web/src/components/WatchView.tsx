@@ -10,7 +10,7 @@ import { api, queryKeys, type Video } from "@/lib/api";
 import { channelHref } from "@/lib/format";
 import { useDeleteVideo } from "@/lib/use-delete-video";
 
-import { ChannelAvatar } from "./ChannelAvatar";
+import { ChannelPhoto } from "./ChannelPhoto";
 import { Description } from "./Description";
 import { ConfirmDialog } from "./Dialog";
 import { DownloadIcon, ExternalIcon, TrashIcon } from "./icons";
@@ -110,7 +110,7 @@ function VideoInfo({ video }: { video: Video }) {
       <h1 className="mt-3 line-clamp-2 text-xl leading-7 font-bold break-words">{video.title}</h1>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <Link href={channelHref(video)} className="flex min-w-0 items-center gap-3">
-          <ChannelAvatar name={video.channel} size={40} />
+          <ChannelPhoto src={video.channel_avatar_url} name={video.channel} size={40} />
           <span className="truncate text-base font-medium">{video.channel ?? "Desconocido"}</span>
         </Link>
         <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">

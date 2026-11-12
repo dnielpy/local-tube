@@ -36,6 +36,14 @@ class Video(Base):
     file_size: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    channel_info: Mapped["Channel | None"] = relationship(
+        primaryjoin="foreign(Video.channel_id) == Channel.id", viewonly=True, lazy="selectin"
+    )
+
+    @property
+    def channel_avatar_url(self) -> str | None:
+        return self.channel_info.avatar_url if self.channel_info else None
+
 
 class Channel(Base):
     __tablename__ = "channels"
@@ -52,6 +60,12 @@ class Channel(Base):
     subscribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     subscription_rank: Mapped[int | None] = mapped_column(Integer)
     videos_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def avatar_url(self) -> str | None:
+        if not self.avatar_path:
+            return None
+        return f"/api/channels/{self.id}/avatar?v={self.avatar_path.rsplit('-', 1)[-1]}"
 
 
 class ChannelVideo(Base):

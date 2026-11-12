@@ -16,6 +16,7 @@ class VideoOut(BaseModel):
     youtube_url: str
     channel: str | None
     channel_id: str | None
+    channel_avatar_url: str | None = None
     duration_seconds: int | None
     file_size: int | None
     created_at: datetime

@@ -145,3 +145,16 @@ async def test_offline_channel_refresh_is_rejected(client):
 async def test_unknown_channel_offline_is_not_found(client):
     connectivity.forced_offline = True
     assert (await client.get("/api/channels/UCnope")).status_code == 404
+
+
+async def test_downloaded_videos_carry_the_cached_channel_avatar(
+    client, make_video, channel_service
+):
+    await make_video("vid1", channel="Alpha", channel_id="UCaaa")
+    await get_channel(client, channel_service, "UCaaa")
+    connectivity.forced_offline = True
+
+    video = (await client.get("/api/videos")).json()["items"][0]
+
+    assert video["channel_avatar_url"].startswith("/api/channels/UCaaa/avatar")
+    assert (await client.get(video["channel_avatar_url"])).status_code == 200

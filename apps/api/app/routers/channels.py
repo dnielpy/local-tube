@@ -24,9 +24,7 @@ ServiceDep = Annotated[ChannelService, Depends(get_channel_service)]
 
 
 def _avatar_url(channel: Channel | None) -> str | None:
-    if channel is None or not channel.avatar_path:
-        return None
-    return f"/api/channels/{channel.id}/avatar?v={channel.avatar_path.rsplit('-', 1)[-1]}"
+    return channel.avatar_url if channel else None
 
 
 async def _downloaded_channels(session: SessionDep) -> list[ChannelOut]:
