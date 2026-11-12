@@ -7,6 +7,7 @@ import { Suspense, useState, type FormEvent } from "react";
 import { IconButton } from "./IconButton";
 import { DownloadsButton, DownloadsButtonFallback } from "./DownloadsButton";
 import { BackIcon, CloseIcon, Logo, MenuIcon, SearchIcon } from "./icons";
+import { ProfileMenu } from "./profiles/ProfileMenu";
 
 export function Header({ onMenu }: { onMenu: () => void }) {
   const router = useRouter();
@@ -98,6 +99,7 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <Suspense fallback={<DownloadsButtonFallback />}>
           <DownloadsButton />
         </Suspense>
+        <ProfileMenu />
       </div>
     </header>
   );

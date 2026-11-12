@@ -1,4 +1,11 @@
-const key = (id: string) => `localtube:position:${id}`;
+let profile = "";
+
+/** Positions are saved per profile, so each one resumes its own videos. */
+export function setProgressProfile(id: string) {
+  profile = id;
+}
+
+const key = (id: string) => `localtube:${profile}:position:${id}`;
 
 export function readPosition(id: string): { time: number; duration: number } | null {
   try {
