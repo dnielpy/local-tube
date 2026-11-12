@@ -36,6 +36,7 @@ class DownloadResult:
     title: str
     description: str
     channel: str | None
+    channel_id: str | None
     duration_seconds: int | None
     youtube_url: str
     file_path: str
@@ -51,6 +52,15 @@ def parse_youtube_id(url: str) -> str | None:
     if not YoutubeIE.suitable(url):
         return None
     return YoutubeIE.get_temp_id(url)
+
+
+def base_options(cookies_file: str | None, cookies_from_browser: str | None) -> dict[str, Any]:
+    options: dict[str, Any] = {"quiet": True, "no_warnings": True, "noprogress": True}
+    if cookies_file and Path(cookies_file).is_file():
+        options["cookiefile"] = cookies_file
+    elif cookies_from_browser:
+        options["cookiesfrombrowser"] = (cookies_from_browser,)
+    return options
 
 
 class YtDlpDownloader:
@@ -70,9 +80,7 @@ class YtDlpDownloader:
         max_height: int | None = None,
     ) -> dict[str, Any]:
         options: dict[str, Any] = {
-            "quiet": True,
-            "no_warnings": True,
-            "noprogress": True,
+            **base_options(self.cookies_file, self.cookies_from_browser),
             "noplaylist": True,
             "format": format_selector(max_height),
             "merge_output_format": "mp4",
@@ -86,10 +94,6 @@ class YtDlpDownloader:
                 {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"}
             ],
         }
-        if self.cookies_file and Path(self.cookies_file).is_file():
-            options["cookiefile"] = self.cookies_file
-        elif self.cookies_from_browser:
-            options["cookiesfrombrowser"] = (self.cookies_from_browser,)
         if on_progress is not None:
             options["progress_hooks"] = [_progress_hook(on_progress)]
             options["postprocessor_hooks"] = [
@@ -102,7 +106,7 @@ class YtDlpDownloader:
             with yt_dlp.YoutubeDL(self._options()) as ydl:
                 info = ydl.extract_info(url, download=False, process=False)
         except yt_dlp.utils.YoutubeDLError as exc:
-            raise DownloadError(_clean_error(exc)) from exc
+            raise DownloadError(clean_error(exc)) from exc
         if info is None or info.get("_type", "video") not in ("video", "url"):
             raise DownloadError("Only single videos are supported, not playlists or channels")
         return Probe(youtube_id=info["id"], title=info.get("title"), info=info)
@@ -117,7 +121,7 @@ class YtDlpDownloader:
             with yt_dlp.YoutubeDL(self._options(on_progress, max_height)) as ydl:
                 info = ydl.process_ie_result(probe.info, download=True)
         except yt_dlp.utils.YoutubeDLError as exc:
-            raise DownloadError(_clean_error(exc)) from exc
+            raise DownloadError(clean_error(exc)) from exc
 
         video_file = Path(info["requested_downloads"][0]["filepath"])
         thumbnail = video_file.with_name("thumbnail.jpg")
@@ -126,6 +130,7 @@ class YtDlpDownloader:
             title=info.get("title") or info["id"],
             description=info.get("description") or "",
             channel=info.get("channel") or info.get("uploader"),
+            channel_id=info.get("channel_id"),
             duration_seconds=int(info["duration"]) if info.get("duration") else None,
             youtube_url=info.get("webpage_url") or probe.info.get("webpage_url") or "",
             file_path=str(video_file.relative_to(self.media_root.resolve())),
@@ -164,5 +169,5 @@ def _progress_hook(on_progress: Callable[[Progress], None]) -> Callable[[dict[st
     return hook
 
 
-def _clean_error(exc: Exception) -> str:
+def clean_error(exc: Exception) -> str:
     return ANSI_ESCAPE.sub("", str(exc)).strip().removeprefix("ERROR:").strip()

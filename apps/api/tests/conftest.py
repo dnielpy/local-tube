@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
@@ -18,6 +19,8 @@ from app.config import get_settings
 from app.db import SessionLocal, engine
 from app.main import app
 from app.models import Base, Video
+from app.routers.channels import get_channel_service
+from app.services.channels import ChannelService
 from app.services.connectivity import connectivity
 
 
@@ -34,9 +37,12 @@ async def schema() -> AsyncIterator[None]:
 async def clean_tables() -> AsyncIterator[None]:
     connectivity.reachable = True
     connectivity.forced_offline = False
+    shutil.rmtree(get_settings().media_root / ".cache", ignore_errors=True)
     yield
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE download_jobs, videos, app_settings CASCADE"))
+        await conn.execute(
+            text("TRUNCATE download_jobs, videos, app_settings, channel_videos, channels CASCADE")
+        )
 
 
 @pytest.fixture
@@ -76,3 +82,75 @@ def make_video(media_root: Path) -> Callable[..., Awaitable[Video]]:
             return video
 
     return factory
+
+
+class FakeYouTube:
+    def __init__(self) -> None:
+        from app.services.youtube import ChannelPage, RemoteChannel, RemoteVideo
+
+        self.calls: list[str] = []
+        self.subs = [
+            RemoteChannel(
+                id="UCaaa", name="Alpha", handle="@alpha", avatar_url="https://img/a=s176"
+            ),
+            RemoteChannel(id="UCbbb", name="beta", handle="@beta", avatar_url="https://img/b=s176"),
+        ]
+        self.pages = {
+            "UCaaa": ChannelPage(
+                channel=RemoteChannel(
+                    id="UCaaa",
+                    name="Alpha",
+                    handle="@alpha",
+                    description="Alpha channel",
+                    subscriber_count=1200,
+                    avatar_url="https://img/a=s176",
+                    banner_url="https://img/a-banner=w1280",
+                ),
+                videos=[
+                    RemoteVideo(
+                        youtube_id=f"vid{i}",
+                        title=f"Video {i}",
+                        duration_seconds=60 * i,
+                        view_count=100 * i,
+                        published_at=None,
+                        thumbnail_url=f"https://i.ytimg.com/vi/vid{i}/mqdefault.jpg",
+                    )
+                    for i in range(3)
+                ],
+            )
+        }
+
+    def subscriptions(self):
+        self.calls.append("subscriptions")
+        return self.subs
+
+    def channel(self, channel_id, limit=10):
+        self.calls.append(f"channel:{channel_id}")
+        return self.pages[channel_id]
+
+
+class FakeFetch:
+    def __init__(self) -> None:
+        self.urls: list[str] = []
+
+    async def __call__(self, url: str) -> tuple[bytes, str]:
+        self.urls.append(url)
+        return b"\xff\xd8\xff image " + url.encode(), "image/jpeg"
+
+
+@pytest.fixture
+def youtube() -> FakeYouTube:
+    return FakeYouTube()
+
+
+@pytest.fixture
+def fetch() -> FakeFetch:
+    return FakeFetch()
+
+
+@pytest.fixture(autouse=True)
+def channel_service(youtube: FakeYouTube, fetch: FakeFetch):
+    service = ChannelService(youtube, fetch)
+    app.dependency_overrides[get_channel_service] = lambda: service
+    yield service
+    app.dependency_overrides.pop(get_channel_service, None)

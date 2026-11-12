@@ -25,6 +25,7 @@ async def list_videos(
     session: SessionDep,
     q: str | None = None,
     channel: str | None = None,
+    channel_id: str | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 60,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> VideoPage:
@@ -34,6 +35,8 @@ async def list_videos(
         query = query.where(or_(Video.title.ilike(pattern), Video.channel.ilike(pattern)))
     if channel:
         query = query.where(Video.channel == channel)
+    if channel_id:
+        query = query.where(Video.channel_id == channel_id)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.scalars(
         query.order_by(Video.created_at.desc()).limit(limit).offset(offset)

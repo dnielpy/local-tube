@@ -2,7 +2,17 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Enum, Float, ForeignKey, Integer, Text, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    Text,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -21,9 +31,41 @@ class Video(Base):
     youtube_url: Mapped[str] = mapped_column(Text)
     thumbnail_path: Mapped[str | None] = mapped_column(Text)
     channel: Mapped[str | None] = mapped_column(Text)
+    channel_id: Mapped[str | None] = mapped_column(Text, index=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     file_size: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Channel(Base):
+    __tablename__ = "channels"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    handle: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    subscriber_count: Mapped[int | None] = mapped_column(BigInteger)
+    avatar_path: Mapped[str | None] = mapped_column(Text)
+    avatar_source_url: Mapped[str | None] = mapped_column(Text)
+    banner_path: Mapped[str | None] = mapped_column(Text)
+    banner_source_url: Mapped[str | None] = mapped_column(Text)
+    subscribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    videos_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChannelVideo(Base):
+    __tablename__ = "channel_videos"
+
+    youtube_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    channel_id: Mapped[str] = mapped_column(
+        ForeignKey("channels.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(Text)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    view_count: Mapped[int | None] = mapped_column(BigInteger)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    thumbnail_path: Mapped[str | None] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer)
 
 
 class AppSetting(Base):
@@ -46,6 +88,7 @@ class DownloadJob(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     url: Mapped[str] = mapped_column(Text)
+    youtube_id: Mapped[str | None] = mapped_column(Text, index=True)
     status: Mapped[JobStatus] = mapped_column(
         Enum(JobStatus, name="job_status"), default=JobStatus.queued, index=True
     )

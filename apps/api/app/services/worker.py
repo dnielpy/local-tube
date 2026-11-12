@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Protocol
 
 from sqlalchemy import select, update
@@ -30,9 +31,16 @@ class ProgressCallback(Protocol):
 
 
 class DownloadWorker:
-    def __init__(self, downloader: Downloader, concurrency: int = 1) -> None:
+    def __init__(
+        self,
+        downloader: Downloader,
+        concurrency: int = 1,
+        on_video_added: Callable[[str | None], Awaitable[None]] | None = None,
+    ) -> None:
         self.downloader = downloader
         self.concurrency = concurrency
+        self.on_video_added = on_video_added
+        self._background: set[asyncio.Task[None]] = set()
         self._wakeup = asyncio.Event()
         self._tasks: list[asyncio.Task[None]] = []
 
@@ -112,6 +120,11 @@ class DownloadWorker:
             job.title = result.title
             job.video_id = video.id
             await session.commit()
+
+        if self.on_video_added is not None:
+            task = asyncio.create_task(self.on_video_added(result.channel_id))
+            self._background.add(task)
+            task.add_done_callback(self._background.discard)
 
 
 async def claim_next_job() -> tuple[uuid.UUID, str, int | None] | None:

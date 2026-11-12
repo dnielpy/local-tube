@@ -15,6 +15,7 @@ class VideoOut(BaseModel):
     description: str
     youtube_url: str
     channel: str | None
+    channel_id: str | None
     duration_seconds: int | None
     file_size: int | None
     created_at: datetime
@@ -56,6 +57,7 @@ class DownloadJobOut(BaseModel):
 
     id: uuid.UUID
     url: str
+    youtube_id: str | None
     status: JobStatus
     progress: float
     speed: str | None
@@ -66,3 +68,46 @@ class DownloadJobOut(BaseModel):
     video_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+class ChannelOut(BaseModel):
+    id: str | None
+    name: str
+    handle: str | None = None
+    subscribed: bool = False
+    downloaded_count: int = 0
+    avatar_url: str | None = None
+
+
+class ChannelList(BaseModel):
+    syncing: bool
+    items: list[ChannelOut]
+
+
+class RemoteVideoOut(BaseModel):
+    youtube_id: str
+    title: str
+    duration_seconds: int | None
+    view_count: int | None
+    published_at: datetime | None
+    thumbnail_url: str | None
+    youtube_url: str
+    video_id: uuid.UUID | None = None
+
+
+class ChannelDetail(BaseModel):
+    id: str
+    known: bool
+    refreshing: bool
+    name: str
+    handle: str | None
+    description: str | None
+    subscriber_count: int | None
+    subscribed: bool
+    avatar_url: str | None
+    banner_url: str | None
+    youtube_url: str
+    online: bool
+    latest: list[RemoteVideoOut]
+    latest_fetched_at: datetime | None
+    downloaded: list[VideoOut]

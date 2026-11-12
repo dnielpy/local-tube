@@ -7,7 +7,7 @@ from app.services.downloader import (
     DownloadResult,
     Probe,
     Progress,
-    _clean_error,
+    clean_error,
     format_selector,
 )
 from app.services.worker import DownloadWorker, format_eta, format_speed, requeue_interrupted_jobs
@@ -38,6 +38,7 @@ class FakeDownloader:
             title="Never Gonna Give You Up",
             description="The official video",
             channel="Rick Astley",
+            channel_id="UCuAXFkgsw1L7xaCfnd5JJOw",
             duration_seconds=213,
             youtube_url=URL,
             file_path=f"{probe.youtube_id}/video.mp4",
@@ -184,6 +185,6 @@ def test_format_selector_caps_height():
     assert format_selector(None).startswith("bv*[ext=mp4]")
 
 
-def test_clean_error_strips_colors():
+def testclean_error_strips_colors():
     error = Exception("\x1b[0;31mERROR:\x1b[0m [youtube] abc: Sign in to confirm")
-    assert _clean_error(error) == "[youtube] abc: Sign in to confirm"
+    assert clean_error(error) == "[youtube] abc: Sign in to confirm"

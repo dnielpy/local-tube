@@ -59,7 +59,7 @@ async def create_download(
         if "max_height" in body.model_fields_set
         else get_settings().default_max_height
     )
-    job = DownloadJob(url=url, max_height=max_height)
+    job = DownloadJob(url=url, youtube_id=youtube_id, max_height=max_height)
     session.add(job)
     await session.commit()
     await session.refresh(job)
