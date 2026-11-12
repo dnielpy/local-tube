@@ -133,7 +133,7 @@ export const queryKeys = {
   session: ["session"] as const,
   profiles: ["profiles"] as const,
   cookieStatus: ["cookie-status"] as const,
-  history: (q = "") => ["history", q] as const,
+  history: (q: string, limit: number) => ["history", q, limit] as const,
   allHistory: ["history"] as const,
   watchProgress: ["watch-progress"] as const,
   playlists: (videoId?: string) => ["playlists", videoId ?? null] as const,

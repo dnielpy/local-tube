@@ -6,14 +6,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { browser } from "react-dom";
 
-import { api, queryKeys, type Video } from "@/lib/api";
+import { api, queryKeys, type PlaylistDetail, type Video } from "@/lib/api";
 import { channelHref } from "@/lib/format";
 import { useDeleteVideo } from "@/lib/use-delete-video";
+import { useLike } from "@/lib/use-playlists";
 
 import { ChannelPhoto } from "./ChannelPhoto";
 import { Description } from "./Description";
 import { ConfirmDialog } from "./Dialog";
-import { DownloadIcon, ExternalIcon, TrashIcon } from "./icons";
+import { DownloadIcon, ExternalIcon, LikeFilledIcon, LikeIcon, SaveIcon, TrashIcon } from "./icons";
+import { playHref } from "./library/PlaylistView";
+import { SaveDialog } from "./library/SaveDialog";
+import { VideoRow } from "./library/VideoRow";
 import { Player } from "./player/Player";
 import { WatchNext, WatchNextSkeleton } from "./WatchNext";
 
@@ -21,8 +25,15 @@ const THEATER_KEY = "localtube:theater";
 
 export function WatchView() {
   use(browser("Library data is fetched from the api in the browser."));
-  const id = useSearchParams().get("v") ?? "";
+  const params = useSearchParams();
+  const id = params.get("v") ?? "";
+  const listId = params.get("list");
   const router = useRouter();
+  const playlist = useQuery({
+    queryKey: queryKeys.playlist(listId ?? ""),
+    queryFn: () => api.playlist(listId ?? ""),
+    enabled: Boolean(listId),
+  });
   const video = useQuery({
     queryKey: queryKeys.video(id),
     queryFn: () => api.video(id),
@@ -54,7 +65,11 @@ export function WatchView() {
   }
 
   const others = (library.data?.items ?? []).filter((item) => item.id !== id);
-  const next = others[0];
+  const queue = playlist.data?.items ?? [];
+  const position = queue.findIndex((item) => item.video.id === id);
+  // Inside a playlist the next video is the following one in it, as on YouTube.
+  const next = listId ? queue[position + 1]?.video : others[0];
+  const nextHref = next ? (listId ? playHref(listId, next.id) : `/watch?v=${next.id}`) : undefined;
 
   if (!id || video.isError) {
     return (
@@ -77,13 +92,18 @@ export function WatchView() {
       video={video.data}
       theater={theater}
       onToggleTheater={toggleTheater}
-      onNext={next ? () => router.push(`/watch?v=${next.id}`) : undefined}
+      onNext={nextHref ? () => router.push(nextHref) : undefined}
     />
   ) : (
     <div className="aspect-video w-full bg-black search:rounded-xl" />
   );
 
-  const secondary = library.isPending ? <WatchNextSkeleton /> : <WatchNext videos={others} />;
+  const secondary = (
+    <>
+      {playlist.data && <PlaylistPanel playlist={playlist.data} current={id} />}
+      {library.isPending ? <WatchNextSkeleton /> : <WatchNext videos={others} />}
+    </>
+  );
 
   return (
     <div data-watch className="watch-layout" data-theater={theater}>
@@ -101,6 +121,7 @@ export function WatchView() {
 function VideoInfo({ video }: { video: Video }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
   const remove = useDeleteVideo(() => router.push("/"));
   const pill =
     "flex h-9 shrink-0 items-center gap-[6px] rounded-full bg-yt-surface px-4 text-sm font-medium hover:bg-yt-surface-hover";
@@ -114,6 +135,11 @@ function VideoInfo({ video }: { video: Video }) {
           <span className="truncate text-base font-medium">{video.channel ?? "Desconocido"}</span>
         </Link>
         <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
+          <LikeButton videoId={video.id} className={pill} />
+          <button type="button" onClick={() => setSaving(true)} className={pill}>
+            <SaveIcon />
+            Guardar
+          </button>
           <a href={video.youtube_url} target="_blank" rel="noreferrer" className={pill}>
             <ExternalIcon />
             YouTube
@@ -129,6 +155,7 @@ function VideoInfo({ video }: { video: Video }) {
         </div>
       </div>
       <Description video={video} />
+      {saving && <SaveDialog video={video} onClose={() => setSaving(false)} />}
       <ConfirmDialog
         open={confirming}
         title="¿Eliminar video?"
@@ -153,5 +180,51 @@ function InfoSkeleton() {
       </div>
       <div className="yt-skeleton h-24 w-full rounded-xl" />
     </div>
+  );
+}
+
+function LikeButton({ videoId, className }: { videoId: string; className: string }) {
+  const like = useLike(videoId);
+  return (
+    <button
+      type="button"
+      aria-pressed={like.liked}
+      disabled={!like.ready}
+      onClick={like.toggle}
+      title={like.liked ? "Ya no me gusta" : "Me gusta"}
+      className={className}
+    >
+      {like.liked ? <LikeFilledIcon /> : <LikeIcon />}
+      Me gusta
+    </button>
+  );
+}
+
+/** The playlist being played, above the suggestions, like YouTube's playlist panel. */
+function PlaylistPanel({ playlist, current }: { playlist: PlaylistDetail; current: string }) {
+  const index = playlist.items.findIndex((item) => item.video.id === current);
+  return (
+    <section className="mb-4 overflow-hidden rounded-xl border border-yt-border">
+      <header className="bg-yt-surface px-4 py-3">
+        <Link href={`/playlist?list=${playlist.id}`} className="block truncate text-xl font-bold">
+          {playlist.name}
+        </Link>
+        <p className="mt-1 text-xs text-yt-text-secondary">
+          {index >= 0 ? `${index + 1} / ${playlist.count}` : `${playlist.count} videos`}
+        </p>
+      </header>
+      <div className="max-h-[400px] overflow-y-auto py-2">
+        {playlist.items.map((item, position) => (
+          <VideoRow
+            key={item.video.id}
+            video={item.video}
+            href={playHref(playlist.id, item.video.id)}
+            index={position + 1}
+            current={item.video.id === current}
+            size="small"
+          />
+        ))}
+      </div>
+    </section>
   );
 }

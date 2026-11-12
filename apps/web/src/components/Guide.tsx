@@ -2,8 +2,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Suspense, use, useEffect, useState, type ComponentType, type SVGProps } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  Suspense,
+  use,
+  useEffect,
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys } from "@/lib/api";
@@ -19,14 +27,20 @@ import {
 import { ChannelPhoto } from "./ChannelPhoto";
 import { CookiesDialog } from "./profiles/ProfileMenu";
 import {
+  ChevronRightIcon,
   CollapseIcon,
   DownloadFilledIcon,
   DownloadIcon,
   ExpandIcon,
+  HistoryIcon,
   HomeFilledIcon,
   HomeIcon,
+  LikeIcon,
   Logo,
   MenuIcon,
+  PlaylistIcon,
+  WatchLaterIcon,
+  YouIcon,
 } from "./icons";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
@@ -36,6 +50,7 @@ const ENTRIES: Entry[] = [
   { href: "/", label: "Inicio", icon: HomeIcon, activeIcon: HomeFilledIcon },
   { href: "/downloads", label: "Descargas", icon: DownloadIcon, activeIcon: DownloadFilledIcon },
 ];
+const YOU: Entry = { href: "/library", label: "Tú", icon: YouIcon, activeIcon: YouIcon };
 
 function useActive() {
   const pathname = usePathname();
@@ -169,6 +184,85 @@ function MiniStatusDot() {
   );
 }
 
+function GuideLink({
+  href,
+  label,
+  icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex h-10 items-center gap-6 rounded-[10px] px-3 ${
+        active ? "bg-yt-surface font-medium hover:bg-yt-surface-hover" : "hover:bg-yt-surface"
+      }`}
+    >
+      {icon}
+      <span className="truncate text-sm">{label}</span>
+    </Link>
+  );
+}
+
+/** The "Tú" section of YouTube's guide: history and playlists of the profile. */
+function GuideYou() {
+  use(browser("The playlists of the profile come from the api."));
+  const pathname = usePathname();
+  const list = useSearchParams().get("list");
+  const playlists = useQuery({ queryKey: queryKeys.playlists(), queryFn: () => api.playlists() });
+  const system = (kind: string) => playlists.data?.find((playlist) => playlist.kind === kind);
+  const watchLater = system("watch_later");
+  const liked = system("liked");
+
+  return (
+    <section className="border-b border-yt-divider px-3 py-3">
+      <Link
+        href="/library"
+        className={`flex h-10 items-center gap-2 rounded-[10px] px-3 text-base font-medium ${
+          pathname === "/library"
+            ? "bg-yt-surface hover:bg-yt-surface-hover"
+            : "hover:bg-yt-surface"
+        }`}
+      >
+        Tú
+        <ChevronRightIcon size={20} />
+      </Link>
+      <GuideLink
+        href="/history"
+        label="Historial"
+        icon={<HistoryIcon />}
+        active={pathname === "/history"}
+      />
+      <GuideLink
+        href="/playlists"
+        label="Listas de reproducción"
+        icon={<PlaylistIcon />}
+        active={pathname === "/playlists"}
+      />
+      {watchLater && (
+        <GuideLink
+          href={`/playlist?list=${watchLater.id}`}
+          label="Ver más tarde"
+          icon={<WatchLaterIcon />}
+          active={pathname === "/playlist" && list === watchLater.id}
+        />
+      )}
+      {liked && (
+        <GuideLink
+          href={`/playlist?list=${liked.id}`}
+          label="Videos que me gustan"
+          icon={<LikeIcon />}
+          active={pathname === "/playlist" && list === liked.id}
+        />
+      )}
+    </section>
+  );
+}
+
 function GuideContents() {
   const isActive = useActive();
 
@@ -193,6 +287,9 @@ function GuideContents() {
           );
         })}
       </section>
+      <Suspense>
+        <GuideYou />
+      </Suspense>
       <Suspense>
         <GuideStatus />
       </Suspense>
@@ -223,7 +320,7 @@ export function MiniGuide({ className = "" }: { className?: string }) {
     <aside
       className={`fixed top-14 bottom-0 left-0 z-20 w-[72px] flex-col bg-yt-bg px-1 pt-1 ${className}`}
     >
-      {ENTRIES.map(({ href, label, icon: Icon, activeIcon: ActiveIcon }) => {
+      {[...ENTRIES, YOU].map(({ href, label, icon: Icon, activeIcon: ActiveIcon }) => {
         const active = isActive(href);
         return (
           <Link
