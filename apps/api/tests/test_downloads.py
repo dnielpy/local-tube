@@ -203,3 +203,17 @@ async def test_worker_waits_while_offline(client, media_root):
     connectivity.forced_offline = False
     assert await worker.run_once() is True
     assert (await client.get(f"/api/downloads/{job['id']}")).json()["status"] == "completed"
+
+
+async def test_worker_caches_the_channel_before_completing(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    seen: list[tuple[str | None, str]] = []
+
+    async def on_video_added(channel_id: str | None) -> None:
+        status = (await client.get(f"/api/downloads/{job['id']}")).json()["status"]
+        seen.append((channel_id, status))
+
+    await DownloadWorker(FakeDownloader(media_root), on_video_added=on_video_added).run_once()
+
+    assert seen == [("UCuAXFkgsw1L7xaCfnd5JJOw", "downloading")]
+    assert (await client.get(f"/api/downloads/{job['id']}")).json()["status"] == "completed"

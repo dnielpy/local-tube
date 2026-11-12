@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         worker = DownloadWorker(
             downloader,
             settings.download_concurrency,
-            on_video_added=channel_service.refresh_in_background,
+            on_video_added=channel_service.ensure_channel_media,
         )
         await worker.start()
         backfill = asyncio.create_task(
@@ -45,8 +45,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 lambda url: downloader.probe(url).info.get("channel_id")
             )
         )
+    media_sweep = asyncio.create_task(channel_service.keep_channel_media())
     app.state.worker = worker
     yield
+    media_sweep.cancel()
     if backfill is not None:
         backfill.cancel()
     if worker is not None:

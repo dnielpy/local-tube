@@ -158,3 +158,50 @@ async def test_downloaded_videos_carry_the_cached_channel_avatar(
 
     assert video["channel_avatar_url"].startswith("/api/channels/UCaaa/avatar")
     assert (await client.get(video["channel_avatar_url"])).status_code == 200
+
+
+async def test_channel_media_is_cached_for_downloaded_videos(
+    client, youtube, make_video, channel_service
+):
+    await make_video("vid1", channel="Alpha", channel_id="UCaaa")
+
+    await channel_service.ensure_downloaded_channels_media()
+
+    assert youtube.calls == ["channel:UCaaa"]
+    video = (await client.get("/api/videos")).json()["items"][0]
+    assert (await client.get(video["channel_avatar_url"])).status_code == 200
+
+
+async def test_channel_media_is_not_refetched_when_cached(
+    client, youtube, make_video, channel_service
+):
+    await make_video("vid1", channel="Alpha", channel_id="UCaaa")
+    await channel_service.ensure_downloaded_channels_media()
+
+    await channel_service.ensure_downloaded_channels_media()
+
+    assert youtube.calls == ["channel:UCaaa"]
+
+
+async def test_missing_avatar_file_is_downloaded_again(
+    client, youtube, make_video, channel_service, media_root
+):
+    await make_video("vid1", channel="Alpha", channel_id="UCaaa")
+    await channel_service.ensure_downloaded_channels_media()
+    for avatar in (media_root / ".cache" / "avatars").iterdir():
+        avatar.unlink()
+
+    await channel_service.ensure_downloaded_channels_media()
+
+    assert youtube.calls == ["channel:UCaaa", "channel:UCaaa"]
+    video = (await client.get("/api/videos")).json()["items"][0]
+    assert (await client.get(video["channel_avatar_url"])).status_code == 200
+
+
+async def test_channel_media_waits_for_a_connection(youtube, make_video, channel_service):
+    await make_video("vid1", channel="Alpha", channel_id="UCaaa")
+    connectivity.forced_offline = True
+
+    await channel_service.ensure_downloaded_channels_media()
+
+    assert youtube.calls == []

@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 ACTIVE_STATUSES = (JobStatus.queued, JobStatus.downloading, JobStatus.processing)
 FLUSH_INTERVAL = 1.0
 IDLE_POLL_INTERVAL = 5.0
+MEDIA_TIMEOUT = 60.0
 
 
 class Downloader(Protocol):
@@ -41,7 +42,6 @@ class DownloadWorker:
         self.downloader = downloader
         self.concurrency = concurrency
         self.on_video_added = on_video_added
-        self._background: set[asyncio.Task[None]] = set()
         self._wakeup = asyncio.Event()
         self._tasks: list[asyncio.Task[None]] = []
 
@@ -110,6 +110,12 @@ class DownloadWorker:
                 latest.clear()
         result = download.result()
 
+        if self.on_video_added is not None:
+            try:
+                await asyncio.wait_for(self.on_video_added(result.channel_id), MEDIA_TIMEOUT)
+            except Exception:
+                logger.warning("could not cache the channel of %s", result.youtube_id)
+
         async with SessionLocal() as session:
             video = await _find_video(result.youtube_id, session)
             if video is None:
@@ -123,11 +129,6 @@ class DownloadWorker:
             job.title = result.title
             job.video_id = video.id
             await session.commit()
-
-        if self.on_video_added is not None:
-            task = asyncio.create_task(self.on_video_added(result.channel_id))
-            self._background.add(task)
-            task.add_done_callback(self._background.discard)
 
 
 async def claim_next_job() -> tuple[uuid.UUID, str, int | None] | None:

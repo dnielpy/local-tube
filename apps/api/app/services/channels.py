@@ -6,6 +6,7 @@ from typing import Protocol
 from sqlalchemy import delete, select, update
 
 from app.db import SessionLocal
+from app.media import media_path
 from app.models import Channel, ChannelVideo, Video
 from app.services.connectivity import connectivity
 from app.services.image_cache import ImageFetcher, cache_image, http_fetch, remove_cached
@@ -17,6 +18,8 @@ logger = logging.getLogger(__name__)
 SUBSCRIPTIONS_TTL = timedelta(hours=24)
 CHANNEL_TTL = timedelta(hours=6)
 AVATAR_CONCURRENCY = 8
+MEDIA_RETRY = timedelta(hours=1)
+MEDIA_SWEEP_INTERVAL = 600
 SUBSCRIPTIONS_SYNCED_KEY = "subscriptions_synced_at"
 
 
@@ -137,13 +140,42 @@ class ChannelService:
             await self._store_page(channel_id, page)
             return True
 
-    async def refresh_in_background(self, channel_id: str | None) -> None:
-        if not channel_id:
+    async def needs_media(self, channel_id: str) -> bool:
+        async with SessionLocal() as session:
+            channel = await session.get(Channel, channel_id)
+        if channel is None or channel.videos_fetched_at is None:
+            return True
+        cached = all(
+            path is None or media_path(path).is_file()
+            for path in (channel.avatar_path, channel.banner_path)
+        )
+        if channel.avatar_path and cached:
+            return False
+        return _now() - channel.videos_fetched_at >= MEDIA_RETRY or not cached
+
+    async def ensure_channel_media(self, channel_id: str | None) -> None:
+        if not channel_id or not connectivity.online:
             return
         try:
-            await self.refresh_channel(channel_id)
+            if await self.needs_media(channel_id):
+                await self.refresh_channel(channel_id, force=True)
         except Exception:
-            logger.exception("background refresh of %s failed", channel_id)
+            logger.exception("could not cache the media of channel %s", channel_id)
+
+    async def ensure_downloaded_channels_media(self) -> None:
+        async with SessionLocal() as session:
+            channel_ids = list(
+                await session.scalars(
+                    select(Video.channel_id).where(Video.channel_id.is_not(None)).distinct()
+                )
+            )
+        for channel_id in channel_ids:
+            await self.ensure_channel_media(channel_id)
+
+    async def keep_channel_media(self, interval: float = MEDIA_SWEEP_INTERVAL) -> None:
+        while True:
+            await self.ensure_downloaded_channels_media()
+            await asyncio.sleep(interval)
 
     async def _store_page(self, channel_id: str, page: ChannelPage) -> None:
         remote = page.channel
@@ -222,4 +254,4 @@ class ChannelService:
                 await session.execute(
                     update(Video).where(Video.id == video.id).values(channel_id=channel_id)
                 )
-            await self.refresh_in_background(channel_id)
+            await self.ensure_channel_media(channel_id)
