@@ -126,6 +126,20 @@ class ProfileSubscription(Base):
     rank: Mapped[int] = mapped_column(Integer)
 
 
+class AutoDownloadChannel(Base):
+    """A channel whose new videos a profile wants to be offered for download."""
+
+    __tablename__ = "auto_download_channels"
+
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True
+    )
+    channel_id: Mapped[str] = mapped_column(
+        ForeignKey("channels.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class WatchEntry(Base):
     """A video in a profile's history, with where it was left."""
 

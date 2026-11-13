@@ -32,6 +32,7 @@ import {
   DownloadFilledIcon,
   DownloadIcon,
   ExpandIcon,
+  GearIcon,
   HistoryIcon,
   HomeFilledIcon,
   HomeIcon,
@@ -51,6 +52,12 @@ const ENTRIES: Entry[] = [
   { href: "/downloads", label: "Descargas", icon: DownloadIcon, activeIcon: DownloadFilledIcon },
 ];
 const YOU: Entry = { href: "/library", label: "Tú", icon: YouIcon, activeIcon: YouIcon };
+const SETTINGS: Entry = {
+  href: "/settings",
+  label: "Ajustes",
+  icon: GearIcon,
+  activeIcon: GearIcon,
+};
 
 function useActive() {
   const pathname = usePathname();
@@ -296,6 +303,14 @@ function GuideContents() {
       <Suspense>
         <GuideChannels />
       </Suspense>
+      <section className="border-b border-yt-divider px-3 py-3">
+        <GuideLink
+          href={SETTINGS.href}
+          label={SETTINGS.label}
+          icon={<GearIcon />}
+          active={isActive(SETTINGS.href)}
+        />
+      </section>
       <footer className="px-6 py-4 text-xs text-yt-text-secondary">
         <p className="font-medium">LocalTube</p>
         <p className="mt-3 text-[#717171]">Tu biblioteca de videos en la red local</p>
@@ -320,7 +335,7 @@ export function MiniGuide({ className = "" }: { className?: string }) {
     <aside
       className={`fixed top-14 bottom-0 left-0 z-20 w-[72px] flex-col bg-yt-bg px-1 pt-1 ${className}`}
     >
-      {[...ENTRIES, YOU].map(({ href, label, icon: Icon, activeIcon: ActiveIcon }) => {
+      {[...ENTRIES, YOU, SETTINGS].map(({ href, label, icon: Icon, activeIcon: ActiveIcon }) => {
         const active = isActive(href);
         return (
           <Link

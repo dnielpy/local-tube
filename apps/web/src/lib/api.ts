@@ -18,6 +18,8 @@ export type HistoryEntry = components["schemas"]["HistoryEntryOut"];
 export type WatchProgress = components["schemas"]["WatchProgressOut"];
 export type Playlist = components["schemas"]["PlaylistOut"];
 export type PlaylistDetail = components["schemas"]["PlaylistDetail"];
+export type AutoDownloadChannel = components["schemas"]["AutoDownloadChannelOut"];
+export type PendingVideos = components["schemas"]["PendingVideos"];
 
 export class ApiError extends Error {
   constructor(
@@ -116,8 +118,18 @@ export const api = {
     request<void>(`/playlists/${id}/videos/${videoId}`, { method: "DELETE" }),
   deleteVideo: (id: string) => request<void>(`/videos/${id}`, { method: "DELETE" }),
   downloads: () => request<DownloadJob[]>("/downloads"),
-  formats: (url: string) =>
-    request<VideoFormats>(`/downloads/formats?url=${encodeURIComponent(url)}`),
+  formats: (url: string, signal?: AbortSignal) =>
+    request<VideoFormats>(`/downloads/formats?url=${encodeURIComponent(url)}`, { signal }),
+  autoDownloadChannels: () => request<AutoDownloadChannel[]>("/auto-download/channels"),
+  setAutoDownloadChannels: (channelIds: string[]) =>
+    request<AutoDownloadChannel[]>("/auto-download/channels", {
+      method: "PUT",
+      body: JSON.stringify({ channel_ids: channelIds }),
+    }),
+  pendingVideos: (channelId: string, signal?: AbortSignal) =>
+    request<PendingVideos>(`/auto-download/channels/${encodeURIComponent(channelId)}/pending`, {
+      signal,
+    }),
   createDownload: ({ url, maxHeight }: { url: string; maxHeight: number | null }) =>
     request<DownloadJob>("/downloads", {
       method: "POST",
@@ -149,4 +161,5 @@ export const queryKeys = {
   video: (id: string) => ["video", id] as const,
   downloads: ["downloads"] as const,
   formats: (url: string) => ["formats", url] as const,
+  autoDownloadChannels: ["auto-download-channels"] as const,
 };

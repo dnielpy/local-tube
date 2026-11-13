@@ -5,18 +5,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { api, ApiError, queryKeys, type DownloadJob } from "@/lib/api";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { formatBytes, formatDuration, qualityName } from "@/lib/format";
 
 import { AlertIcon } from "./icons";
-
-function qualityName(height: number): string {
-  if (height >= 2160) return "4K";
-  if (height >= 1440) return "Quad HD";
-  if (height >= 1080) return "Full HD";
-  if (height >= 720) return "Alta";
-  if (height >= 360) return "Media";
-  return "Baja";
-}
 
 function errorText(error: unknown): string {
   if (error instanceof ApiError && error.status === 503) {

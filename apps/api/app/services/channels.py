@@ -12,7 +12,7 @@ from app.models import Channel, ChannelVideo, ProfileSubscription, Video
 from app.services.connectivity import connectivity
 from app.services.image_cache import ImageFetcher, cache_image, http_fetch, remove_cached
 from app.services.profiles import cookies_path
-from app.services.youtube import ChannelPage, RemoteChannel, YouTubeError
+from app.services.youtube import ChannelPage, RemoteChannel, RemoteVideo, YouTubeError
 from app.services.youtube_cookies import recheck_soon
 from app.settings_store import read_setting, write_setting
 
@@ -168,6 +168,13 @@ class ChannelService:
                 return False
             await self._store_page(channel_id, page)
             return True
+
+    async def latest_videos(self, channel_id: str) -> list[RemoteVideo]:
+        """Ask YouTube for the newest videos of a channel, keeping its page up to date too."""
+        async with self._lock(channel_id):
+            page = await asyncio.to_thread(self.client.channel, channel_id)
+            await self._store_page(channel_id, page)
+            return page.videos
 
     async def load_videos(self, channel_id: str, offset: int) -> bool:
         """Cache the page of channel videos starting at offset and say if more follow."""

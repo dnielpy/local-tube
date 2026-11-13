@@ -245,3 +245,16 @@ class PlaylistItemOut(BaseModel):
 class PlaylistDetail(PlaylistOut):
     items: list[PlaylistItemOut]
     duration_seconds: int
+
+
+class AutoDownloadChannelOut(ChannelOut):
+    enabled: bool = False
+
+
+class AutoDownloadChannelsIn(BaseModel):
+    channel_ids: list[str] = Field(max_length=500)
+
+
+class PendingVideos(BaseModel):
+    channel: ChannelOut
+    videos: list[RemoteVideoOut]

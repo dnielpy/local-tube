@@ -49,6 +49,22 @@ export function channelHref(channel: { channel_id?: string | null; channel?: str
   return `/?channel=${encodeURIComponent(channel.channel ?? "")}`;
 }
 
+export function qualityName(height: number): string {
+  if (height >= 2160) return "4K";
+  if (height >= 1440) return "Quad HD";
+  if (height >= 1080) return "Full HD";
+  if (height >= 720) return "Alta";
+  if (height >= 360) return "Media";
+  return "Baja";
+}
+
+/** The best quality up to `preferred`, or the lowest one when all are above it. */
+export function preferredHeight(heights: number[], preferred: number): number | null {
+  if (heights.length === 0) return null;
+  const lower = heights.filter((height) => height <= preferred);
+  return lower.length > 0 ? Math.max(...lower) : Math.min(...heights);
+}
+
 export function formatBytes(bytes: number | null | undefined): string | null {
   if (!bytes) return null;
   const units = ["B", "KB", "MB", "GB", "TB"];

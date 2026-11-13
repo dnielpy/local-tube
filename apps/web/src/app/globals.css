@@ -122,6 +122,52 @@ body {
   }
 }
 
+@keyframes yt-progress-run {
+  from {
+    left: -4rem;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@keyframes yt-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+  50% {
+    opacity: 0.75;
+    scale: 1.35;
+  }
+}
+
+@keyframes yt-halo {
+  from {
+    opacity: 0.8;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 1.6;
+  }
+}
+
+@keyframes yt-pop {
+  0% {
+    scale: 0.6;
+    opacity: 0;
+  }
+  60% {
+    scale: 1.15;
+    opacity: 1;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
 @keyframes yt-spin {
   to {
     transform: rotate(360deg);

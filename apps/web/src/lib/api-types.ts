@@ -528,10 +528,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto-download/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_channels_api_auto_download_channels_get"];
+        put: operations["set_channels_api_auto_download_channels_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto-download/channels/{channel_id}/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["pending_videos_api_auto_download_channels__channel_id__pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AutoDownloadChannelOut: {
+            id: string | null;
+            name: string;
+            handle?: string | null;
+            subscribed: boolean;
+            downloaded_count: number;
+            avatar_url?: string | null;
+            enabled: boolean;
+        };
+        AutoDownloadChannelsIn: {
+            channel_ids: string[];
+        };
         ChannelDetail: {
             id: string;
             known: boolean;
@@ -604,6 +648,10 @@ export interface components {
             total: number;
         };
         JobStatus: "queued" | "downloading" | "processing" | "completed" | "failed" | "cancelled";
+        PendingVideos: {
+            channel: components["schemas"]["ChannelOut"];
+            videos: components["schemas"]["RemoteVideoOut"][];
+        };
         PinIn: {
             pin: string;
         };
@@ -2054,6 +2102,99 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_channels_api_auto_download_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDownloadChannelOut"][];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_channels_api_auto_download_channels_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoDownloadChannelsIn"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDownloadChannelOut"][];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_videos_api_auto_download_channels__channel_id__pending_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingVideos"];
+                };
             };
             422: {
                 headers: {

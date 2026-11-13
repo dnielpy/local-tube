@@ -30,6 +30,7 @@ class RemoteVideo:
     view_count: int | None
     published_at: datetime | None
     thumbnail_url: str
+    live_status: str | None = None
 
 
 @dataclass
@@ -123,6 +124,7 @@ class YtDlpYouTubeClient:
                     view_count=entry.get("view_count"),
                     published_at=datetime.fromtimestamp(timestamp, UTC) if timestamp else None,
                     thumbnail_url=video_thumbnail_url(entry["id"]),
+                    live_status=entry.get("live_status"),
                 )
             )
         return ChannelPage(channel=channel, videos=videos)

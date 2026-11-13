@@ -34,7 +34,7 @@ def get_channel_service(request: Request) -> ChannelService:
 ServiceDep = Annotated[ChannelService, Depends(get_channel_service)]
 
 
-def _avatar_url(channel: Channel | None) -> str | None:
+def avatar_url_of(channel: Channel | None) -> str | None:
     return channel.avatar_url if channel else None
 
 
@@ -69,13 +69,13 @@ async def _downloaded_channels(session: SessionDep, profile: Profile) -> list[Ch
                 handle=channel.handle if channel else None,
                 subscribed=channel_id in subscribed,
                 downloaded_count=count,
-                avatar_url=_avatar_url(channel),
+                avatar_url=avatar_url_of(channel),
             )
         )
     return result
 
 
-async def _subscribed_channels(session: SessionDep, profile: Profile) -> list[ChannelOut]:
+async def subscribed_channels(session: SessionDep, profile: Profile) -> list[ChannelOut]:
     counts = dict(
         (
             await session.execute(
@@ -98,14 +98,14 @@ async def _subscribed_channels(session: SessionDep, profile: Profile) -> list[Ch
             handle=channel.handle,
             subscribed=True,
             downloaded_count=counts.get(channel.id, 0),
-            avatar_url=_avatar_url(channel),
+            avatar_url=avatar_url_of(channel),
         )
         for channel in channels
     ]
 
 
 async def _channel_list(session: SessionDep, profile: Profile, syncing: bool) -> ChannelList:
-    subscribed = await _subscribed_channels(session, profile)
+    subscribed = await subscribed_channels(session, profile)
     if subscribed:
         return ChannelList(syncing=syncing, items=subscribed)
     return ChannelList(syncing=syncing, items=await _downloaded_channels(session, profile))
@@ -129,7 +129,7 @@ async def sync_channels(
     return await _channel_list(session, profile, syncing)
 
 
-async def _remote_videos(
+async def remote_videos(
     session: SessionDep, profile: Profile, videos: Iterable[ChannelVideo]
 ) -> list[RemoteVideoOut]:
     remote = list(videos)
@@ -188,7 +188,7 @@ async def get_channel(
 
     latest: list[RemoteVideoOut] = []
     if connectivity.online and channel is not None:
-        latest = await _remote_videos(
+        latest = await remote_videos(
             session,
             profile,
             await session.scalars(
@@ -211,7 +211,7 @@ async def get_channel(
         description=channel.description if channel else None,
         subscriber_count=channel.subscriber_count if channel else None,
         subscribed=channel_id in await _subscribed_ids(session, profile),
-        avatar_url=_avatar_url(channel),
+        avatar_url=avatar_url_of(channel),
         banner_url=(
             f"/api/channels/{channel_id}/banner?v={channel.banner_path.rsplit('-', 1)[-1]}"
             if channel and channel.banner_path
@@ -241,7 +241,7 @@ async def channel_videos(
         has_more = await service.load_videos(channel_id, offset)
     except YouTubeError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, {"message": str(exc)}) from exc
-    items = await _remote_videos(
+    items = await remote_videos(
         session,
         profile,
         await session.scalars(
