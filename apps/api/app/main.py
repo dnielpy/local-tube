@@ -13,6 +13,7 @@ from app.routers import (
     health,
     library,
     profiles,
+    stats,
     status,
     videos,
 )
@@ -78,3 +79,4 @@ app.include_router(profiles.router, prefix="/api")
 app.include_router(library.router, prefix="/api")
 app.include_router(auto_download.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
+app.include_router(stats.router, prefix="/api")

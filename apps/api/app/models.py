@@ -173,6 +173,21 @@ class WatchEntry(Base):
     video: Mapped[Video] = relationship(lazy="selectin")
 
 
+class WatchEvent(Base):
+    """Seconds of a video a profile played between two saves of its position, to add up the time
+    watched."""
+
+    __tablename__ = "watch_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), index=True
+    )
+    video_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"))
+    seconds: Mapped[float] = mapped_column(Float)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class PlaylistKind(enum.StrEnum):
     watch_later = "watch_later"
     liked = "liked"

@@ -7,7 +7,15 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.db import SessionDep
-from app.models import Playlist, PlaylistItem, PlaylistKind, Profile, Video, WatchEntry
+from app.models import (
+    Playlist,
+    PlaylistItem,
+    PlaylistKind,
+    Profile,
+    Video,
+    WatchEntry,
+    WatchEvent,
+)
 from app.schemas import (
     HistoryEntryOut,
     HistoryPage,
@@ -20,6 +28,7 @@ from app.schemas import (
 )
 from app.services.library import in_library
 from app.services.profiles import ProfileDep
+from app.services.watch_time import played_seconds
 
 router = APIRouter(tags=["library"])
 
@@ -44,8 +53,16 @@ async def record_watch(
     video_id: uuid.UUID, body: WatchIn, session: SessionDep, profile: ProfileDep
 ) -> None:
     await _library_video(session, profile, video_id)
+    now = datetime.now(UTC)
+    previous = await session.get(WatchEntry, (profile.id, video_id))
+    if previous is not None:
+        played = played_seconds(previous.position, previous.watched_at, body.position, now)
+        if played is not None:
+            session.add(
+                WatchEvent(profile_id=profile.id, video_id=video_id, seconds=played, at=now)
+            )
     values = {
-        "watched_at": datetime.now(UTC),
+        "watched_at": now,
         "position": body.position,
         "duration": body.duration,
     }

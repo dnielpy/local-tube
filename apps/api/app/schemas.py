@@ -304,3 +304,26 @@ class FeedOut(BaseModel):
     refreshed_at: datetime | None
     channel_count: int
     items: list[FeedItemOut]
+
+
+class ActiveDownloadOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str | None
+    status: JobStatus
+    progress: float
+    speed: str | None
+    eta: str | None
+
+
+class ActiveDownloadsOut(BaseModel):
+    count: int
+    items: list[ActiveDownloadOut]
+
+
+class WatchTimeOut(BaseModel):
+    profile_id: uuid.UUID
+    name: str
+    avatar_url: str | None
+    seconds: float

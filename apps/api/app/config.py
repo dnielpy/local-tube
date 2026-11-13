@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     connectivity_check: bool = True
     connectivity_url: str = "https://www.youtube.com/generate_204"
     connectivity_interval: float = 60
+    # Lets other apps on the server read /api/stats with the X-Service-Token header;
+    # unset disables it.
+    service_token: str | None = None
 
 
 @lru_cache

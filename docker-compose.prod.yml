@@ -39,6 +39,7 @@ services:
       PROFILES_ROOT: /config/profiles
       DOWNLOAD_CONCURRENCY: ${DOWNLOAD_CONCURRENCY:-1}
       DEFAULT_MAX_HEIGHT: ${DEFAULT_MAX_HEIGHT:-360}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:-}
       TZ: ${TZ:-America/Havana}
     ports:
       - "${API_PORT:-3005}:8000"
