@@ -169,10 +169,10 @@ class ChannelService:
             await self._store_page(channel_id, page)
             return True
 
-    async def latest_videos(self, channel_id: str) -> list[RemoteVideo]:
+    async def latest_videos(self, channel_id: str, limit: int = PAGE_SIZE) -> list[RemoteVideo]:
         """Ask YouTube for the newest videos of a channel, keeping its page up to date too."""
         async with self._lock(channel_id):
-            page = await asyncio.to_thread(self.client.channel, channel_id)
+            page = await asyncio.to_thread(self.client.channel, channel_id, limit)
             await self._store_page(channel_id, page)
             return page.videos
 

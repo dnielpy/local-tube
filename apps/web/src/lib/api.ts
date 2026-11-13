@@ -20,6 +20,7 @@ export type Playlist = components["schemas"]["PlaylistOut"];
 export type PlaylistDetail = components["schemas"]["PlaylistDetail"];
 export type AutoDownloadChannel = components["schemas"]["AutoDownloadChannelOut"];
 export type PendingVideos = components["schemas"]["PendingVideos"];
+export type AutoDownloadSettings = components["schemas"]["AutoDownloadSettings"];
 
 export class ApiError extends Error {
   constructor(
@@ -120,6 +121,12 @@ export const api = {
   downloads: () => request<DownloadJob[]>("/downloads"),
   formats: (url: string, signal?: AbortSignal) =>
     request<VideoFormats>(`/downloads/formats?url=${encodeURIComponent(url)}`, { signal }),
+  autoDownloadSettings: () => request<AutoDownloadSettings>("/auto-download/settings"),
+  setAutoDownloadSettings: (settings: AutoDownloadSettings) =>
+    request<AutoDownloadSettings>("/auto-download/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
   autoDownloadChannels: () => request<AutoDownloadChannel[]>("/auto-download/channels"),
   setAutoDownloadChannels: (channelIds: string[]) =>
     request<AutoDownloadChannel[]>("/auto-download/channels", {
@@ -130,10 +137,20 @@ export const api = {
     request<PendingVideos>(`/auto-download/channels/${encodeURIComponent(channelId)}/pending`, {
       signal,
     }),
-  createDownload: ({ url, maxHeight }: { url: string; maxHeight: number | null }) =>
+  createDownload: ({
+    url,
+    maxHeight,
+    startAt = null,
+    title = null,
+  }: {
+    url: string;
+    maxHeight: number | null;
+    startAt?: string | null;
+    title?: string | null;
+  }) =>
     request<DownloadJob>("/downloads", {
       method: "POST",
-      body: JSON.stringify({ url, max_height: maxHeight }),
+      body: JSON.stringify({ url, max_height: maxHeight, start_at: startAt, title }),
     }),
   cancelDownload: (id: string) =>
     request<DownloadJob>(`/downloads/${id}/cancel`, { method: "POST" }),
@@ -162,4 +179,5 @@ export const queryKeys = {
   downloads: ["downloads"] as const,
   formats: (url: string) => ["formats", url] as const,
   autoDownloadChannels: ["auto-download-channels"] as const,
+  autoDownloadSettings: ["auto-download-settings"] as const,
 };

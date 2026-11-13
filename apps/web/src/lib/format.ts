@@ -65,6 +65,19 @@ export function preferredHeight(heights: number[], preferred: number): number | 
   return lower.length > 0 ? Math.max(...lower) : Math.min(...heights);
 }
 
+/** The next time the clock shows `time` ("HH:MM"), today or tomorrow. */
+export function nextAt(time: string, now: Date = new Date()): Date {
+  const [hours, minutes] = time.split(":").map(Number);
+  const next = new Date(now);
+  next.setHours(hours, minutes, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  return next;
+}
+
+export function formatClock(value: Date | string): string {
+  return new Date(value).toLocaleTimeString("es", { hour: "numeric", minute: "2-digit" });
+}
+
 export function formatBytes(bytes: number | null | undefined): string | null {
   if (!bytes) return null;
   const units = ["B", "KB", "MB", "GB", "TB"];

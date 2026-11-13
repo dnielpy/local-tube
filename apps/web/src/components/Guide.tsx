@@ -50,14 +50,9 @@ type Entry = { href: string; label: string; icon: Icon; activeIcon: Icon };
 const ENTRIES: Entry[] = [
   { href: "/", label: "Inicio", icon: HomeIcon, activeIcon: HomeFilledIcon },
   { href: "/downloads", label: "Descargas", icon: DownloadIcon, activeIcon: DownloadFilledIcon },
+  { href: "/settings", label: "Ajustes", icon: GearIcon, activeIcon: GearIcon },
 ];
 const YOU: Entry = { href: "/library", label: "Tú", icon: YouIcon, activeIcon: YouIcon };
-const SETTINGS: Entry = {
-  href: "/settings",
-  label: "Ajustes",
-  icon: GearIcon,
-  activeIcon: GearIcon,
-};
 
 function useActive() {
   const pathname = usePathname();
@@ -158,7 +153,7 @@ function GuideChannels() {
           key={channel.id ?? channel.name}
           href={channelHref({ channel_id: channel.id, channel: channel.name })}
           title={channel.name}
-          className="flex h-10 items-center gap-6 rounded-[10px] px-3 hover:bg-yt-surface"
+          className="my-0.5 flex h-9 items-center gap-6 rounded-[10px] px-3 hover:bg-white/5"
         >
           <ChannelPhoto src={channel.avatar_url} name={channel.name} size={24} />
           <span className="truncate text-sm">{channel.name}</span>
@@ -205,8 +200,8 @@ function GuideLink({
   return (
     <Link
       href={href}
-      className={`flex h-10 items-center gap-6 rounded-[10px] px-3 ${
-        active ? "bg-yt-surface font-medium hover:bg-yt-surface-hover" : "hover:bg-yt-surface"
+      className={`my-0.5 flex h-9 items-center gap-6 rounded-[10px] px-3 ${
+        active ? "bg-white/10 font-medium hover:bg-white/15" : "hover:bg-white/5"
       }`}
     >
       {icon}
@@ -229,10 +224,8 @@ function GuideYou() {
     <section className="border-b border-yt-divider px-3 py-3">
       <Link
         href="/library"
-        className={`flex h-10 items-center gap-2 rounded-[10px] px-3 text-base font-medium ${
-          pathname === "/library"
-            ? "bg-yt-surface hover:bg-yt-surface-hover"
-            : "hover:bg-yt-surface"
+        className={`my-0.5 flex h-9 items-center gap-2 rounded-[10px] px-3 text-base font-medium ${
+          pathname === "/library" ? "bg-white/10 hover:bg-white/15" : "hover:bg-white/5"
         }`}
       >
         Tú
@@ -282,10 +275,8 @@ function GuideContents() {
             <Link
               key={href}
               href={href}
-              className={`flex h-10 items-center gap-6 rounded-[10px] px-3 ${
-                active
-                  ? "bg-yt-surface font-medium hover:bg-yt-surface-hover"
-                  : "hover:bg-yt-surface"
+              className={`my-0.5 flex h-9 items-center gap-6 rounded-[10px] px-3 ${
+                active ? "bg-white/10 font-medium hover:bg-white/15" : "hover:bg-white/5"
               }`}
             >
               {active ? <ActiveIcon /> : <Icon />}
@@ -303,14 +294,6 @@ function GuideContents() {
       <Suspense>
         <GuideChannels />
       </Suspense>
-      <section className="border-b border-yt-divider px-3 py-3">
-        <GuideLink
-          href={SETTINGS.href}
-          label={SETTINGS.label}
-          icon={<GearIcon />}
-          active={isActive(SETTINGS.href)}
-        />
-      </section>
       <footer className="px-6 py-4 text-xs text-yt-text-secondary">
         <p className="font-medium">LocalTube</p>
         <p className="mt-3 text-[#717171]">Tu biblioteca de videos en la red local</p>
@@ -335,7 +318,7 @@ export function MiniGuide({ className = "" }: { className?: string }) {
     <aside
       className={`fixed top-14 bottom-0 left-0 z-20 w-[72px] flex-col bg-yt-bg px-1 pt-1 ${className}`}
     >
-      {[...ENTRIES, YOU, SETTINGS].map(({ href, label, icon: Icon, activeIcon: ActiveIcon }) => {
+      {[...ENTRIES, YOU].map(({ href, label, icon: Icon, activeIcon: ActiveIcon }) => {
         const active = isActive(href);
         return (
           <Link

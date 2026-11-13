@@ -1,0 +1,86 @@
+name: localtube
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  api:
+    build:
+      context: apps/api
+      args:
+        # A new value makes the build fetch the latest yt-dlp, which YouTube keeps breaking.
+        YTDLP_REFRESH: ${YTDLP_REFRESH:-}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      MEDIA_ROOT: /media
+      PROFILES_ROOT: /config/profiles
+      DOWNLOAD_CONCURRENCY: ${DOWNLOAD_CONCURRENCY:-1}
+      DEFAULT_MAX_HEIGHT: ${DEFAULT_MAX_HEIGHT:-360}
+      TZ: ${TZ:-America/Havana}
+    volumes:
+      # The folder on the external drive where the videos are kept. With the drive unmounted the
+      # api fails to start instead of filling the system disk with videos.
+      - type: bind
+        source: ${MEDIA_PATH:?Set MEDIA_PATH to the folder on the drive for the videos}
+        target: /media
+        bind:
+          create_host_path: false
+      # Profiles and their YouTube cookies.
+      - localtube-config:/config
+    logging: *logging
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Server-rendered dates use the container's timezone
+      TZ: ${TZ:-America/Havana}
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${PORT:-80}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy-data:
+  localtube-config:

@@ -1,6 +1,9 @@
+from datetime import UTC, datetime, timedelta
+
 from app.db import SessionLocal
 from app.models import DownloadJob, JobStatus
 from app.services.connectivity import connectivity
+from app.services.worker import claim_next_job
 from app.services.youtube import RemoteVideo
 
 
@@ -123,3 +126,52 @@ async def test_pending_needs_a_connection(client, youtube):
 
     assert response.status_code == 503
     assert youtube.calls == []
+
+
+async def test_settings_have_defaults_and_are_saved(client):
+    defaults = (await client.get("/api/auto-download/settings")).json()
+    saved = await client.put(
+        "/api/auto-download/settings",
+        json={"max_height": 720, "start_time": "01:30", "per_channel": 3},
+    )
+    after = (await client.get("/api/auto-download/settings")).json()
+
+    assert defaults == {"max_height": 480, "start_time": None, "per_channel": 10}
+    assert saved.status_code == 200
+    assert after == {"max_height": 720, "start_time": "01:30", "per_channel": 3}
+
+
+async def test_settings_reject_unknown_values(client):
+    for body in (
+        {"max_height": 500},
+        {"start_time": "25:00"},
+        {"per_channel": 0},
+    ):
+        response = await client.put("/api/auto-download/settings", json=body)
+        assert response.status_code == 422, body
+
+
+async def test_offers_at_most_the_videos_per_channel_setting(client, youtube, make_video):
+    await make_video("ancient", channel_id="UCaaa")
+    set_videos(youtube, *(remote(f"new{i}") for i in range(12)))
+    await client.put("/api/auto-download/settings", json={"per_channel": 3})
+
+    assert await pending(client) == ["new0", "new1", "new2"]
+
+
+async def test_scheduled_downloads_wait_for_their_hour(client):
+    later = datetime.now(UTC) + timedelta(hours=2)
+    response = await client.post(
+        "/api/downloads",
+        json={"url": "https://www.youtube.com/watch?v=later", "start_at": later.isoformat()},
+    )
+    assert response.status_code == 201
+    assert response.json()["start_at"] is not None
+
+    assert await claim_next_job() is None
+
+    async with SessionLocal() as session, session.begin():
+        job = await session.get(DownloadJob, response.json()["id"])
+        job.start_at = datetime.now(UTC) - timedelta(minutes=1)
+    claimed = await claim_next_job()
+    assert claimed is not None and str(claimed[0]) == response.json()["id"]

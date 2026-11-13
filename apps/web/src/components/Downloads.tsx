@@ -6,7 +6,7 @@ import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
-import { formatBytes, formatDuration, timeAgo } from "@/lib/format";
+import { formatBytes, formatClock, formatDuration, timeAgo } from "@/lib/format";
 import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
 import { IconButton } from "./IconButton";
@@ -214,7 +214,11 @@ function JobRow({ job }: { job: DownloadJob }) {
   );
 
   const details = [
-    active && (cancel.isPending || cancel.isSuccess) ? "Parando…" : STATUS_LABEL[job.status],
+    active && (cancel.isPending || cancel.isSuccess)
+      ? "Parando…"
+      : job.status === "queued" && job.start_at && new Date(job.start_at) > new Date()
+        ? `Programado · ${formatClock(job.start_at)}`
+        : STATUS_LABEL[job.status],
     job.max_height ? `${job.max_height}p` : "Máxima",
   ];
   if (job.status === "downloading") {

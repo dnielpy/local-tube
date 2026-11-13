@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.models import JobStatus, PlaylistKind
 
@@ -44,6 +44,9 @@ QUALITIES = (144, 240, 360, 480, 720, 1080, 1440, 2160)
 class DownloadCreate(BaseModel):
     url: str
     max_height: int | None = None
+    start_at: AwareDatetime | None = None
+    # Shown until the download starts and reads the real one.
+    title: str | None = Field(default=None, max_length=500)
 
     @field_validator("max_height")
     @classmethod
@@ -81,6 +84,7 @@ class DownloadJobOut(BaseModel):
     error: str | None
     title: str | None
     max_height: int | None
+    start_at: datetime | None = None
     duration_seconds: int | None
     size_bytes: int | None
     video_id: uuid.UUID | None
@@ -258,3 +262,17 @@ class AutoDownloadChannelsIn(BaseModel):
 class PendingVideos(BaseModel):
     channel: ChannelOut
     videos: list[RemoteVideoOut]
+
+
+class AutoDownloadSettings(BaseModel):
+    max_height: int = 480
+    # "HH:MM" in the viewer's time: queued videos start downloading then. None starts them now.
+    start_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    per_channel: int = Field(default=10, ge=1, le=30)
+
+    @field_validator("max_height")
+    @classmethod
+    def known_quality(cls, value: int) -> int:
+        if value not in QUALITIES:
+            raise ValueError(f"max_height must be one of {QUALITIES}")
+        return value

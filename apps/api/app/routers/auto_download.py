@@ -4,17 +4,44 @@ from sqlalchemy import delete, exists, select
 from app.db import SessionDep
 from app.models import AutoDownloadChannel, Channel, ChannelVideo, DownloadJob, Profile, Video
 from app.routers.channels import ServiceDep, avatar_url_of, remote_videos, subscribed_channels
-from app.schemas import AutoDownloadChannelOut, AutoDownloadChannelsIn, ChannelOut, PendingVideos
+from app.schemas import (
+    AutoDownloadChannelOut,
+    AutoDownloadChannelsIn,
+    AutoDownloadSettings,
+    ChannelOut,
+    PendingVideos,
+)
 from app.services.connectivity import connectivity
 from app.services.library import in_library
 from app.services.profiles import ProfileDep
 from app.services.worker import ACTIVE_STATUSES
 from app.services.youtube import YouTubeError
+from app.settings_store import read_setting, write_setting
 
 router = APIRouter(prefix="/auto-download", tags=["auto-download"])
 
 # Streams that are live or not out yet cannot be downloaded as a video.
 NOT_DOWNLOADABLE = {"is_live", "is_upcoming", "post_live"}
+
+
+def _settings_key(profile: Profile) -> str:
+    return f"auto_download:{profile.id}"
+
+
+async def read_settings(profile: Profile) -> AutoDownloadSettings:
+    stored = await read_setting(_settings_key(profile))
+    return AutoDownloadSettings.model_validate_json(stored) if stored else AutoDownloadSettings()
+
+
+@router.get("/settings", response_model=AutoDownloadSettings)
+async def get_settings(profile: ProfileDep) -> AutoDownloadSettings:
+    return await read_settings(profile)
+
+
+@router.put("/settings", response_model=AutoDownloadSettings)
+async def put_settings(body: AutoDownloadSettings, profile: ProfileDep) -> AutoDownloadSettings:
+    await write_setting(_settings_key(profile), body.model_dump_json())
+    return body
 
 
 async def _channels(session: SessionDep, profile: Profile) -> list[AutoDownloadChannelOut]:
@@ -72,14 +99,14 @@ async def set_channels(
 async def pending_videos(
     channel_id: str, session: SessionDep, service: ServiceDep, profile: ProfileDep
 ) -> PendingVideos:
-    """The channel's videos newer than the newest one in the library, up to one page of them.
+    """The channel's videos newer than the newest one in the library, up to `per_channel`.
 
     With no video of the channel in the library yet, only its latest one.
     """
     if not connectivity.online:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, {"message": "Sin conexión"})
     try:
-        latest = await service.latest_videos(channel_id)
+        latest = await service.latest_videos(channel_id, (await read_settings(profile)).per_channel)
     except YouTubeError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, {"message": str(exc)}) from exc
 

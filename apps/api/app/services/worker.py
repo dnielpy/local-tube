@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 
 from app.db import SessionLocal
 from app.media import remove_video_dir
@@ -212,7 +212,10 @@ async def claim_next_job() -> tuple[uuid.UUID, str, int | None, uuid.UUID | None
     async with SessionLocal() as session, session.begin():
         job = await session.scalar(
             select(DownloadJob)
-            .where(DownloadJob.status == JobStatus.queued)
+            .where(
+                DownloadJob.status == JobStatus.queued,
+                or_(DownloadJob.start_at.is_(None), DownloadJob.start_at <= func.now()),
+            )
             .order_by(DownloadJob.created_at)
             .limit(1)
             .with_for_update(skip_locked=True)

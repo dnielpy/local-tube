@@ -8,15 +8,27 @@ import {
   api,
   ApiError,
   queryKeys,
+  type AutoDownloadSettings,
   type Channel,
   type RemoteVideo,
   type VideoFormats,
 } from "@/lib/api";
-import { formatBytes, formatDuration, preferredHeight, qualityName } from "@/lib/format";
+import {
+  formatBytes,
+  formatClock,
+  formatDuration,
+  nextAt,
+  preferredHeight,
+  qualityName,
+} from "@/lib/format";
 
 import { AlertIcon, BoltIcon, CloseIcon, DownloadIcon } from "./icons";
 
-const DEFAULT_HEIGHT = 480;
+const DEFAULT_SETTINGS: AutoDownloadSettings = {
+  max_height: 480,
+  start_time: null,
+  per_channel: 10,
+};
 // Looking for new videos fills the first half of the bar, sizing them the second.
 const SEARCH_SHARE = 50;
 
@@ -63,6 +75,7 @@ export function AutoDownloadDialog({ onClose }: { onClose: () => void }) {
   const [problems, setProblems] = useState<Problems>({ channels: 0, videos: 0, signIn: false });
   const [queueing, setQueueing] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -77,6 +90,9 @@ export function AutoDownloadDialog({ onClose }: { onClose: () => void }) {
       setScan({ phase: "scanning", label, progress, found });
 
     async function run() {
+      const options = await api.autoDownloadSettings().catch(() => DEFAULT_SETTINGS);
+      if (signal.aborted) return;
+      setSettings(options);
       const channels = (await api.autoDownloadChannels()).filter(
         (channel) => channel.enabled && channel.id,
       );
@@ -125,7 +141,7 @@ export function AutoDownloadDialog({ onClose }: { onClose: () => void }) {
             formats,
             height: preferredHeight(
               formats.qualities.map((quality) => quality.height),
-              DEFAULT_HEIGHT,
+              options.max_height,
             ),
             checked: true,
           });
@@ -168,11 +184,14 @@ export function AutoDownloadDialog({ onClose }: { onClose: () => void }) {
     setQueueing(true);
     setQueueError(null);
     let failed = 0;
+    const startAt = settings.start_time ? nextAt(settings.start_time).toISOString() : null;
     for (const item of chosen) {
       try {
         await api.createDownload({
           url: item.video.youtube_url,
-          maxHeight: item.height ?? DEFAULT_HEIGHT,
+          maxHeight: item.height ?? settings.max_height,
+          startAt,
+          title: item.video.title,
         });
       } catch (error) {
         // 409: it is already in the library or on its way.
@@ -320,6 +339,7 @@ export function AutoDownloadDialog({ onClose }: { onClose: () => void }) {
                   <ItemRow
                     key={item.video.youtube_id}
                     item={item}
+                    fallbackHeight={settings.max_height}
                     onChange={(change) =>
                       setItems(items.map((it, i) => (i === index ? { ...it, ...change } : it)))
                     }
@@ -348,6 +368,11 @@ export function AutoDownloadDialog({ onClose }: { onClose: () => void }) {
                     {" · "}
                     {known.length < chosen.length ? "más de " : ""}
                     {formatBytes(total)}
+                  </span>
+                )}
+                {settings.start_time && (
+                  <span className="block text-xs text-yt-text-secondary">
+                    Empezarán a las {formatClock(nextAt(settings.start_time))}
                   </span>
                 )}
               </>
@@ -379,7 +404,15 @@ export function AutoDownloadDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ItemRow({ item, onChange }: { item: Item; onChange: (change: Partial<Item>) => void }) {
+function ItemRow({
+  item,
+  fallbackHeight,
+  onChange,
+}: {
+  item: Item;
+  fallbackHeight: number;
+  onChange: (change: Partial<Item>) => void;
+}) {
   const { video, channel, formats } = item;
   const qualities = [...(formats?.qualities ?? [])].reverse();
   return (
@@ -436,7 +469,7 @@ function ItemRow({ item, onChange }: { item: Item; onChange: (change: Partial<It
             </span>
           ) : (
             <span className="inline-flex h-7 items-center rounded-full bg-yt-surface px-3 text-xs text-yt-text-secondary">
-              Hasta {DEFAULT_HEIGHT}p
+              Hasta {fallbackHeight}p
             </span>
           )}
           <span className="text-xs text-yt-text-secondary tabular-nums">

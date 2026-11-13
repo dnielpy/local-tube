@@ -9,13 +9,18 @@ The monorepo uses Turborepo with pnpm workspaces. The Python app is plugged into
 
 ## Deploying on the server
 
-Requirements: Docker with the Compose plugin.
+Requirements: Docker with the Compose plugin, and the external drive mounted on the server.
 
 ```bash
-cp .env.example .env
-# Edit .env: POSTGRES_PASSWORD and MEDIA_PATH (folder on the external drive).
-docker compose up -d --build
+cp .env.production.example .env.production
+# Edit .env.production: a strong POSTGRES_PASSWORD and MEDIA_PATH, the folder on the external drive.
+mkdir -p /mnt/disco/localtube   # the MEDIA_PATH folder, on the mounted drive
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --wait
 ```
+
+`MEDIA_PATH` must exist before the containers start. If the drive is not mounted, the api refuses to start instead of saving the videos on the system disk. Mount the drive at boot (for example with an `/etc/fstab` entry using `nofail`) so LocalTube finds it after a restart.
+
+To update a running deployment later, run `./scripts/update.sh`. It checks that `MEDIA_PATH` is there, stops the containers, runs `git pull`, and builds and starts them again, waiting until they are healthy. The build also fetches the latest yt-dlp, once a day at most. The database, the profiles with their cookies and the videos are kept.
 
 LocalTube is now at `http://<server-ip>` (or the `PORT` you chose). Caddy is the only exposed service. It sends `/api/*` to FastAPI and everything else to Next.js.
 
@@ -38,11 +43,7 @@ LocalTube checks that the cookies hold a signed-in YouTube session, saves them i
 
 The first profile created takes over the videos and downloads that existed before profiles.
 
-YouTube changes often, and yt-dlp has to keep up. When downloads start failing, rebuild the api image to pull the latest yt-dlp:
-
-```bash
-docker compose build --no-cache api && docker compose up -d api
-```
+YouTube changes often, and yt-dlp has to keep up. When downloads start failing, run `./scripts/update.sh`: the api image is rebuilt with the latest yt-dlp.
 
 ## Online and offline
 

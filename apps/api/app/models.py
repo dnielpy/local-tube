@@ -227,6 +227,8 @@ class DownloadJob(Base):
     error: Mapped[str | None] = mapped_column(Text)
     title: Mapped[str | None] = mapped_column(Text)
     max_height: Mapped[int | None] = mapped_column(Integer)
+    # A queued job waits until then, for downloads scheduled at a later hour.
+    start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     thumbnail_path: Mapped[str | None] = mapped_column(Text)
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger)
