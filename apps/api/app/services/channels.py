@@ -10,6 +10,15 @@ from app.db import SessionLocal
 from app.media import media_path
 from app.models import Channel, ChannelVideo, ProfileSubscription, Video
 from app.services.connectivity import connectivity
+from app.services.feed import (
+    FEED_CONCURRENCY,
+    FEED_SWEEP_INTERVAL,
+    feed_channel_ids,
+    feed_profile_ids,
+    feed_refreshed_at,
+    mark_feed_refreshed,
+    read_feed_settings,
+)
 from app.services.image_cache import ImageFetcher, cache_image, http_fetch, remove_cached
 from app.services.profiles import cookies_path
 from app.services.youtube import ChannelPage, RemoteChannel, RemoteVideo, YouTubeError
@@ -50,6 +59,10 @@ def _subscriptions_task(profile_id: uuid.UUID) -> str:
     return f"subscriptions:{profile_id}"
 
 
+def feed_task(profile_id: uuid.UUID) -> str:
+    return f"feed:{profile_id}"
+
+
 class ChannelService:
     def __init__(self, client: YouTubeClient, fetch: ImageFetcher = http_fetch) -> None:
         self.client = client
@@ -82,14 +95,19 @@ class ChannelService:
         synced = await read_setting(_synced_key(profile_id))
         return not synced or _now() - datetime.fromisoformat(synced) >= SUBSCRIPTIONS_TTL
 
-    async def channel_stale(self, channel_id: str) -> bool:
+    async def channel_stale(self, channel_id: str, ttl: timedelta = CHANNEL_TTL) -> bool:
         async with SessionLocal() as session:
             channel = await session.get(Channel, channel_id)
         return (
             channel is None
             or channel.videos_fetched_at is None
-            or _now() - channel.videos_fetched_at >= CHANNEL_TTL
+            or _now() - channel.videos_fetched_at >= ttl
         )
+
+    async def feed_due(self, profile_id: uuid.UUID) -> bool:
+        refreshed = await feed_refreshed_at(profile_id)
+        hours = (await read_feed_settings(profile_id)).refresh_hours
+        return refreshed is None or _now() - refreshed >= timedelta(hours=hours)
 
     async def schedule_subscriptions(self, profile_id: uuid.UUID, force: bool = False) -> bool:
         if not connectivity.online:
@@ -105,6 +123,50 @@ class ChannelService:
         if force or await self.channel_stale(channel_id):
             return self._spawn(channel_id, self.refresh_channel(channel_id, force=force))
         return self.is_running(channel_id)
+
+    async def schedule_feed(
+        self, profile_id: uuid.UUID, force: bool = False, due_only: bool = True
+    ) -> bool:
+        """Refresh the feed in the background when it is due, or now with force or not due_only.
+
+        Without force, channels fetched within the refresh interval (for example by opening
+        their page) are not asked again.
+        """
+        if not connectivity.online:
+            return False
+        key = feed_task(profile_id)
+        if force or not due_only or await self.feed_due(profile_id):
+            if not await feed_channel_ids(profile_id):
+                return False
+            return self._spawn(key, self.refresh_feed(profile_id, force=force))
+        return self.is_running(key)
+
+    async def refresh_feed(self, profile_id: uuid.UUID, force: bool = False) -> bool:
+        if not connectivity.online:
+            return False
+        ttl = timedelta(hours=(await read_feed_settings(profile_id)).refresh_hours)
+        semaphore = asyncio.Semaphore(FEED_CONCURRENCY)
+
+        async def refresh(channel_id: str) -> None:
+            async with semaphore:
+                if force or await self.channel_stale(channel_id, ttl):
+                    await self.refresh_channel(channel_id, force=True)
+
+        started = _now()
+        await asyncio.gather(
+            *(refresh(channel_id) for channel_id in await feed_channel_ids(profile_id))
+        )
+        await mark_feed_refreshed(profile_id, started)
+        return True
+
+    async def keep_feeds_fresh(self, interval: float = FEED_SWEEP_INTERVAL) -> None:
+        while True:
+            for profile_id in await feed_profile_ids():
+                try:
+                    await self.schedule_feed(profile_id)
+                except Exception:
+                    logger.exception("could not refresh the feed of %s", profile_id)
+            await asyncio.sleep(interval)
 
     async def sync_subscriptions(self, profile_id: uuid.UUID, force: bool = False) -> bool:
         if not connectivity.online:
@@ -210,6 +272,7 @@ class ChannelService:
                         published_at=video.published_at,
                         thumbnail_path=thumbnail,
                         position=position,
+                        live_status=video.live_status,
                     )
                 )
             await session.commit()
@@ -299,6 +362,7 @@ class ChannelService:
                         published_at=video.published_at,
                         thumbnail_path=thumbnail,
                         position=position,
+                        live_status=video.live_status,
                     )
                 )
             await session.commit()

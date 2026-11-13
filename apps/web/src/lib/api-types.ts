@@ -576,11 +576,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/feed/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_settings_api_feed_settings_get"];
+        put: operations["put_settings_api_feed_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feed/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_channels_api_feed_channels_get"];
+        put: operations["set_channels_api_feed_channels_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_feed_api_feed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feed/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refresh_feed_api_feed_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AutoDownloadChannelOut: {
+        AutoDownloadSettings: {
+            max_height: number;
+            start_time?: string | null;
+            per_channel: number;
+        };
+        ChannelChoiceOut: {
             id: string | null;
             name: string;
             handle?: string | null;
@@ -588,14 +657,6 @@ export interface components {
             downloaded_count: number;
             avatar_url?: string | null;
             enabled: boolean;
-        };
-        AutoDownloadChannelsIn: {
-            channel_ids: string[];
-        };
-        AutoDownloadSettings: {
-            max_height: number;
-            start_time?: string | null;
-            per_channel: number;
         };
         ChannelDetail: {
             id: string;
@@ -613,6 +674,9 @@ export interface components {
             latest: components["schemas"]["RemoteVideoOut"][];
             latest_fetched_at: string | null;
             downloaded: components["schemas"]["VideoOut"][];
+        };
+        ChannelIdsIn: {
+            channel_ids: string[];
         };
         ChannelList: {
             syncing: boolean;
@@ -657,6 +721,27 @@ export interface components {
             created_at: string;
             updated_at: string;
             readonly thumbnail_url: string | null;
+        };
+        FeedItemOut: {
+            youtube_id: string;
+            title: string;
+            duration_seconds: number | null;
+            view_count: number | null;
+            published_at: string | null;
+            thumbnail_url: string | null;
+            youtube_url: string;
+            video_id?: string | null;
+            channel: components["schemas"]["ChannelOut"];
+        };
+        FeedOut: {
+            online: boolean;
+            refreshing: boolean;
+            refreshed_at: string | null;
+            channel_count: number;
+            items: components["schemas"]["FeedItemOut"][];
+        };
+        FeedSettings: {
+            refresh_hours: number;
         };
         HTTPValidationError: {
             detail?: components["schemas"]["ValidationError"][];
@@ -2215,7 +2300,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutoDownloadChannelOut"][];
+                    "application/json": components["schemas"]["ChannelChoiceOut"][];
                 };
             };
             422: {
@@ -2239,7 +2324,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutoDownloadChannelsIn"];
+                "application/json": components["schemas"]["ChannelIdsIn"];
             };
         };
         responses: {
@@ -2248,7 +2333,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutoDownloadChannelOut"][];
+                    "application/json": components["schemas"]["ChannelChoiceOut"][];
                 };
             };
             422: {
@@ -2280,6 +2365,188 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PendingVideos"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_feed_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedSettings"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_settings_api_feed_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedSettings"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedSettings"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_channels_api_feed_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelChoiceOut"][];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_channels_api_feed_channels_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelIdsIn"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelChoiceOut"][];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_feed_api_feed_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_feed_api_feed_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedOut"];
                 };
             };
             422: {

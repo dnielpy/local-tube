@@ -251,11 +251,13 @@ class PlaylistDetail(PlaylistOut):
     duration_seconds: int
 
 
-class AutoDownloadChannelOut(ChannelOut):
+class ChannelChoiceOut(ChannelOut):
+    """A channel that can be turned on for a feature such as auto-download or the feed."""
+
     enabled: bool = False
 
 
-class AutoDownloadChannelsIn(BaseModel):
+class ChannelIdsIn(BaseModel):
     channel_ids: list[str] = Field(max_length=500)
 
 
@@ -276,3 +278,29 @@ class AutoDownloadSettings(BaseModel):
         if value not in QUALITIES:
             raise ValueError(f"max_height must be one of {QUALITIES}")
         return value
+
+
+FEED_REFRESH_HOURS = (1, 2, 3, 6, 12, 24)
+
+
+class FeedSettings(BaseModel):
+    refresh_hours: int = 6
+
+    @field_validator("refresh_hours")
+    @classmethod
+    def known_interval(cls, value: int) -> int:
+        if value not in FEED_REFRESH_HOURS:
+            raise ValueError(f"refresh_hours must be one of {FEED_REFRESH_HOURS}")
+        return value
+
+
+class FeedItemOut(RemoteVideoOut):
+    channel: ChannelOut
+
+
+class FeedOut(BaseModel):
+    online: bool
+    refreshing: bool
+    refreshed_at: datetime | None
+    channel_count: int
+    items: list[FeedItemOut]

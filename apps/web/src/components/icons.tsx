@@ -27,6 +27,9 @@ export const GearIcon = icon(
 export const BoltIcon = icon(
   "M13.5 2 5 13.5h5.5L9 22l9-12.5h-5.6L13.5 2zm-1.7 3.9-.5 4.6h4.8l-5.4 7.6.8-5.6H7l4.8-6.6z",
 );
+export const FeedIcon = icon(
+  "M10 18v-6l5 3-5 3zm7-15H7v1h10V3zm3 3H4v1h16V6zm2 3H2v12h20V9zM3 10h18v10H3V10z",
+);
 export const MenuIcon = icon("M21 6H3V5h18v1zm0 5H3v1h18v-1zm0 6H3v1h18v-1z");
 export const HomeIcon = icon(
   "M12 4.44l7 6.09V20h-4v-6H9v6H5v-9.47l7-6.09m0-1.32l-8 6.96V21h6v-6h4v6h6V10.08l-8-6.96z",

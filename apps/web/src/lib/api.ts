@@ -18,9 +18,12 @@ export type HistoryEntry = components["schemas"]["HistoryEntryOut"];
 export type WatchProgress = components["schemas"]["WatchProgressOut"];
 export type Playlist = components["schemas"]["PlaylistOut"];
 export type PlaylistDetail = components["schemas"]["PlaylistDetail"];
-export type AutoDownloadChannel = components["schemas"]["AutoDownloadChannelOut"];
+export type ChannelChoice = components["schemas"]["ChannelChoiceOut"];
 export type PendingVideos = components["schemas"]["PendingVideos"];
 export type AutoDownloadSettings = components["schemas"]["AutoDownloadSettings"];
+export type Feed = components["schemas"]["FeedOut"];
+export type FeedItem = components["schemas"]["FeedItemOut"];
+export type FeedSettings = components["schemas"]["FeedSettings"];
 
 export class ApiError extends Error {
   constructor(
@@ -127,15 +130,26 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(settings),
     }),
-  autoDownloadChannels: () => request<AutoDownloadChannel[]>("/auto-download/channels"),
+  autoDownloadChannels: () => request<ChannelChoice[]>("/auto-download/channels"),
   setAutoDownloadChannels: (channelIds: string[]) =>
-    request<AutoDownloadChannel[]>("/auto-download/channels", {
+    request<ChannelChoice[]>("/auto-download/channels", {
       method: "PUT",
       body: JSON.stringify({ channel_ids: channelIds }),
     }),
   pendingVideos: (channelId: string, signal?: AbortSignal) =>
     request<PendingVideos>(`/auto-download/channels/${encodeURIComponent(channelId)}/pending`, {
       signal,
+    }),
+  feed: () => request<Feed>("/feed"),
+  refreshFeed: () => request<Feed>("/feed/refresh", { method: "POST" }),
+  feedSettings: () => request<FeedSettings>("/feed/settings"),
+  setFeedSettings: (settings: FeedSettings) =>
+    request<FeedSettings>("/feed/settings", { method: "PUT", body: JSON.stringify(settings) }),
+  feedChannels: () => request<ChannelChoice[]>("/feed/channels"),
+  setFeedChannels: (channelIds: string[]) =>
+    request<ChannelChoice[]>("/feed/channels", {
+      method: "PUT",
+      body: JSON.stringify({ channel_ids: channelIds }),
     }),
   createDownload: ({
     url,
@@ -180,4 +194,7 @@ export const queryKeys = {
   formats: (url: string) => ["formats", url] as const,
   autoDownloadChannels: ["auto-download-channels"] as const,
   autoDownloadSettings: ["auto-download-settings"] as const,
+  feed: ["feed"] as const,
+  feedChannels: ["feed-channels"] as const,
+  feedSettings: ["feed-settings"] as const,
 };

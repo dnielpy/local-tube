@@ -3,11 +3,17 @@ from sqlalchemy import delete, exists, select
 
 from app.db import SessionDep
 from app.models import AutoDownloadChannel, Channel, ChannelVideo, DownloadJob, Profile, Video
-from app.routers.channels import ServiceDep, avatar_url_of, remote_videos, subscribed_channels
+from app.routers.channels import (
+    ServiceDep,
+    avatar_url_of,
+    channel_choices,
+    known_channel_ids,
+    remote_videos,
+)
 from app.schemas import (
-    AutoDownloadChannelOut,
-    AutoDownloadChannelsIn,
     AutoDownloadSettings,
+    ChannelChoiceOut,
+    ChannelIdsIn,
     ChannelOut,
     PendingVideos,
 )
@@ -15,13 +21,10 @@ from app.services.connectivity import connectivity
 from app.services.library import in_library
 from app.services.profiles import ProfileDep
 from app.services.worker import ACTIVE_STATUSES
-from app.services.youtube import YouTubeError
+from app.services.youtube import NOT_DOWNLOADABLE, YouTubeError
 from app.settings_store import read_setting, write_setting
 
 router = APIRouter(prefix="/auto-download", tags=["auto-download"])
-
-# Streams that are live or not out yet cannot be downloaded as a video.
-NOT_DOWNLOADABLE = {"is_live", "is_upcoming", "post_live"}
 
 
 def _settings_key(profile: Profile) -> str:
@@ -44,7 +47,7 @@ async def put_settings(body: AutoDownloadSettings, profile: ProfileDep) -> AutoD
     return body
 
 
-async def _channels(session: SessionDep, profile: Profile) -> list[AutoDownloadChannelOut]:
+async def _channels(session: SessionDep, profile: Profile) -> list[ChannelChoiceOut]:
     enabled = set(
         await session.scalars(
             select(AutoDownloadChannel.channel_id).where(
@@ -52,39 +55,19 @@ async def _channels(session: SessionDep, profile: Profile) -> list[AutoDownloadC
             )
         )
     )
-    subscribed = await subscribed_channels(session, profile)
-    listed = {channel.id for channel in subscribed}
-    # Channels still enabled after unsubscribing stay listed, so they can be turned off.
-    others = await session.scalars(
-        select(Channel).where(Channel.id.in_(enabled - listed)).order_by(Channel.name)
-    )
-    return [
-        AutoDownloadChannelOut(**channel.model_dump(), enabled=channel.id in enabled)
-        for channel in subscribed
-    ] + [
-        AutoDownloadChannelOut(
-            id=channel.id,
-            name=channel.name,
-            handle=channel.handle,
-            avatar_url=avatar_url_of(channel),
-            enabled=True,
-        )
-        for channel in others
-    ]
+    return await channel_choices(session, profile, enabled)
 
 
-@router.get("/channels", response_model=list[AutoDownloadChannelOut])
-async def list_channels(session: SessionDep, profile: ProfileDep) -> list[AutoDownloadChannelOut]:
+@router.get("/channels", response_model=list[ChannelChoiceOut])
+async def list_channels(session: SessionDep, profile: ProfileDep) -> list[ChannelChoiceOut]:
     return await _channels(session, profile)
 
 
-@router.put("/channels", response_model=list[AutoDownloadChannelOut])
+@router.put("/channels", response_model=list[ChannelChoiceOut])
 async def set_channels(
-    body: AutoDownloadChannelsIn, session: SessionDep, profile: ProfileDep
-) -> list[AutoDownloadChannelOut]:
-    known = set(
-        await session.scalars(select(Channel.id).where(Channel.id.in_(set(body.channel_ids))))
-    )
+    body: ChannelIdsIn, session: SessionDep, profile: ProfileDep
+) -> list[ChannelChoiceOut]:
+    known = await known_channel_ids(session, body.channel_ids)
     await session.execute(
         delete(AutoDownloadChannel).where(AutoDownloadChannel.profile_id == profile.id)
     )

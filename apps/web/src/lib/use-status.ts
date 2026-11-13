@@ -35,6 +35,7 @@ export function useRefetchOnStatusChange() {
     if (previous.current !== undefined && previous.current !== online) {
       client.invalidateQueries({ queryKey: queryKeys.channels });
       client.invalidateQueries({ queryKey: queryKeys.allChannels });
+      client.invalidateQueries({ queryKey: queryKeys.feed });
     }
     previous.current = online;
   }, [online, client]);

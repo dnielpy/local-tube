@@ -52,6 +52,12 @@ The api checks every minute whether it can reach YouTube (`GET https://www.youtu
 - **Online:** the sidebar lists the profile's real YouTube subscriptions in YouTube's order. A channel page shows the channel's banner, avatar, subscribers and description, its latest 10 videos (each can be opened on YouTube or downloaded), and the videos you have downloaded from it.
 - **Offline:** the sidebar stays exactly the same, built from the cached subscriptions. The only difference is inside a channel: instead of its latest 10 videos, the page shows the videos you have downloaded from it, with the cached banner and avatar. Queued downloads wait and start on their own when the connection comes back.
 
+### Feed
+
+In Ajustes → Feed you choose channels from your subscriptions and how often they are checked (every 6 h by default). Online, the home page then opens on the feed: the latest video of each of those channels, newest first, with "Descargado" on the ones already in your library. Premieres and live streams are skipped until they can be downloaded. The ↻ button in the top bar checks every channel right away. Offline, or with the "Todos" chip, the home page shows your downloaded videos as before.
+
+The api refreshes each profile's feed by itself once the interval passes, even when nobody has LocalTube open, so the feed is ready when you come in. A channel whose page was fetched within the interval, for example because you opened it, is not asked again.
+
 Until the subscriptions have been synced once, the sidebar lists the channels you have downloaded videos from.
 
 Everything that comes from YouTube is cached so it is fetched as rarely as possible:
@@ -60,6 +66,7 @@ Everything that comes from YouTube is cached so it is fetched as rarely as possi
 | --- | --- | --- |
 | Subscriptions | `channels` table | Every 24 h, or with ↻ |
 | A channel's latest 10 videos and its info | `channels`, `channel_videos` | When the page is opened and the cache is older than 6 h, or with "Actualizar" |
+| The feed's channels | `channels`, `channel_videos` | Every feed interval (6 h by default), or with ↻ |
 | Avatars (176 px), banners (1280 px wide) and thumbnails (320×180) | `MEDIA_PATH/.cache/` | Only when YouTube changes the image |
 
 Channel data comes from yt-dlp in flat mode: one request for all subscriptions and one per channel page, with no extra request per video. The browser never talks to YouTube directly. Every image is served by the api from its cache.
@@ -109,6 +116,10 @@ Copy `apps/api/.env.example` to `apps/api/.env`. Profiles and their cookies are 
 | GET | `/api/downloads` | Download history with live progress |
 | POST | `/api/downloads/{id}/retry` | Re-queues a failed download |
 | DELETE | `/api/downloads/{id}` | Removes a finished or failed job from the history |
+| GET | `/api/feed` | The latest video of each feed channel. Starts a refresh when it is due |
+| POST | `/api/feed/refresh` | Checks every feed channel now |
+| GET / PUT | `/api/feed/channels` `{channel_ids}` | The subscriptions, marking the ones in the feed / chooses them |
+| GET / PUT | `/api/feed/settings` `{refresh_hours}` | How often the feed is refreshed: 1, 2, 3, 6, 12 or 24 h |
 
 Downloads are rows in `download_jobs`. A worker inside the api process claims them with `SELECT … FOR UPDATE SKIP LOCKED`. `DOWNLOAD_CONCURRENCY` controls how many run at once. Jobs interrupted by a restart go back to the queue.
 

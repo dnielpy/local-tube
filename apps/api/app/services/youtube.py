@@ -6,6 +6,9 @@ import yt_dlp
 
 from app.services.downloader import base_options, clean_error
 
+# Streams that are live or not out yet cannot be downloaded as a video.
+NOT_DOWNLOADABLE = {"is_live", "is_upcoming", "post_live"}
+
 
 class YouTubeError(Exception):
     pass

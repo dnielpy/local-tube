@@ -9,6 +9,7 @@ from app.routers import (
     auto_download,
     channels,
     downloads,
+    feed,
     health,
     library,
     profiles,
@@ -55,8 +56,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         )
     media_sweep = asyncio.create_task(channel_service.keep_channel_media())
+    feed_sweep = asyncio.create_task(channel_service.keep_feeds_fresh())
     app.state.worker = worker
     yield
+    feed_sweep.cancel()
     media_sweep.cancel()
     if backfill is not None:
         backfill.cancel()
@@ -74,3 +77,4 @@ app.include_router(channels.router, prefix="/api")
 app.include_router(profiles.router, prefix="/api")
 app.include_router(library.router, prefix="/api")
 app.include_router(auto_download.router, prefix="/api")
+app.include_router(feed.router, prefix="/api")

@@ -4,10 +4,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { api, queryKeys, type DownloadJob, type RemoteVideo } from "@/lib/api";
-import { formatCount, formatDuration, timeAgo } from "@/lib/format";
+import { api, queryKeys, type Channel, type DownloadJob, type RemoteVideo } from "@/lib/api";
+import { channelHref, formatCount, formatDuration, timeAgo } from "@/lib/format";
 import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
+import { ChannelPhoto } from "./ChannelPhoto";
 import { CheckIcon, DownloadIcon, ExternalIcon, RetryIcon, StopFilledIcon } from "./icons";
 import { QualityDialog } from "./QualityDialog";
 
@@ -17,7 +18,16 @@ function jobLabel(job: DownloadJob): string {
   return `Descargando ${Math.round(job.progress)}%`;
 }
 
-export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; channelId: string }) {
+/** A video on YouTube; with `channel`, the card shows whose it is, for lists of many channels. */
+export function RemoteVideoCard({
+  video,
+  channelId,
+  channel,
+}: {
+  video: RemoteVideo;
+  channelId: string;
+  channel?: Channel;
+}) {
   const client = useQueryClient();
   const jobs = useDownloadJobs();
   const job = jobs.data?.find((item) => item.youtube_id === video.youtube_id);
@@ -82,76 +92,94 @@ export function RemoteVideoCard({ video, channelId }: { video: RemoteVideo; chan
           {thumbnail}
         </a>
       )}
-      <div className="mt-3">
-        <h3 className="line-clamp-2 text-base leading-[22px] font-medium" title={video.title}>
-          {video.title}
-        </h3>
-        {meta.length > 0 && (
-          <p className="mt-1 text-sm leading-5 text-yt-text-secondary">{meta.join(" · ")}</p>
+      <div className="mt-3 flex gap-3">
+        {channel && (
+          <Link href={channelHref({ channel_id: channelId })} aria-label={channel.name}>
+            <ChannelPhoto src={channel.avatar_url} name={channel.name} />
+          </Link>
         )}
-        <div className="mt-2 flex flex-wrap gap-2">
-          {localId ? (
+        <div className="min-w-0 flex-1">
+          <h3 className="line-clamp-2 text-base leading-[22px] font-medium" title={video.title}>
+            {video.title}
+          </h3>
+          {channel && (
             <Link
-              href={`/watch?v=${localId}`}
-              className={`${pill} bg-yt-cta-bg text-yt-cta-text hover:bg-yt-cta-hover`}
+              href={channelHref({ channel_id: channelId })}
+              className="mt-1 block truncate text-sm leading-5 text-yt-text-secondary hover:text-yt-text"
             >
-              Reproducir
+              {channel.name}
             </Link>
-          ) : (
-            <>
-              <a
-                href={video.youtube_url}
-                target="_blank"
-                rel="noreferrer"
-                className={`${pill} bg-yt-surface hover:bg-yt-surface-hover`}
+          )}
+          {meta.length > 0 && (
+            <p className="mt-1 text-sm leading-5 text-yt-text-secondary">{meta.join(" · ")}</p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {localId ? (
+              <Link
+                href={`/watch?v=${localId}`}
+                className={`${pill} bg-yt-cta-bg text-yt-cta-text hover:bg-yt-cta-hover`}
               >
-                <ExternalIcon size={18} />
-                Ver
-              </a>
-              {active ? (
-                <>
-                  <span className={`${pill} bg-yt-surface text-yt-text-secondary`}>
-                    {cancel.isPending || cancel.isSuccess ? "Parando…" : jobLabel(job)}
-                  </span>
+                Reproducir
+              </Link>
+            ) : (
+              <>
+                <a
+                  href={video.youtube_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`${pill} bg-yt-surface hover:bg-yt-surface-hover`}
+                >
+                  <ExternalIcon size={18} />
+                  Ver
+                </a>
+                {active ? (
+                  <>
+                    <span className={`${pill} bg-yt-surface text-yt-text-secondary`}>
+                      {cancel.isPending || cancel.isSuccess ? "Parando…" : jobLabel(job)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={cancel.isPending || cancel.isSuccess}
+                      onClick={() => cancel.mutate(job.id)}
+                      className={`${pill} bg-yt-surface hover:bg-yt-surface-hover disabled:opacity-50`}
+                    >
+                      <StopFilledIcon size={16} />
+                      Parar
+                    </button>
+                  </>
+                ) : job?.status === "failed" ? (
                   <button
                     type="button"
-                    disabled={cancel.isPending || cancel.isSuccess}
-                    onClick={() => cancel.mutate(job.id)}
-                    className={`${pill} bg-yt-surface hover:bg-yt-surface-hover disabled:opacity-50`}
+                    disabled={retry.isPending}
+                    onClick={() => retry.mutate(job.id)}
+                    title={job.error ?? undefined}
+                    className={`${pill} bg-yt-surface text-yt-error hover:bg-yt-surface-hover`}
                   >
-                    <StopFilledIcon size={16} />
-                    Parar
+                    <RetryIcon size={18} />
+                    Reintentar
                   </button>
-                </>
-              ) : job?.status === "failed" ? (
-                <button
-                  type="button"
-                  disabled={retry.isPending}
-                  onClick={() => retry.mutate(job.id)}
-                  title={job.error ?? undefined}
-                  className={`${pill} bg-yt-surface text-yt-error hover:bg-yt-surface-hover`}
-                >
-                  <RetryIcon size={18} />
-                  Reintentar
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setChoosing(true)}
-                  className={`${pill} bg-yt-cta-bg text-yt-cta-text hover:bg-yt-cta-hover`}
-                >
-                  <DownloadIcon size={18} />
-                  Descargar
-                </button>
-              )}
-            </>
-          )}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setChoosing(true)}
+                    className={`${pill} bg-yt-cta-bg text-yt-cta-text hover:bg-yt-cta-hover`}
+                  >
+                    <DownloadIcon size={18} />
+                    Descargar
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
       <QualityDialog
         url={choosing ? video.youtube_url : null}
         onClose={() => setChoosing(false)}
-        onQueued={() => client.invalidateQueries({ queryKey: queryKeys.channel(channelId) })}
+        onQueued={() => {
+          client.invalidateQueries({ queryKey: queryKeys.channel(channelId) });
+          client.invalidateQueries({ queryKey: queryKeys.feed });
+        }}
       />
     </div>
   );

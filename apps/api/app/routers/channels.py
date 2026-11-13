@@ -9,6 +9,7 @@ from app.db import SessionDep
 from app.media import media_path
 from app.models import Channel, ChannelVideo, Profile, ProfileSubscription, ProfileVideo, Video
 from app.schemas import (
+    ChannelChoiceOut,
     ChannelDetail,
     ChannelList,
     ChannelOut,
@@ -102,6 +103,35 @@ async def subscribed_channels(session: SessionDep, profile: Profile) -> list[Cha
         )
         for channel in channels
     ]
+
+
+async def channel_choices(
+    session: SessionDep, profile: Profile, enabled: set[str]
+) -> list[ChannelChoiceOut]:
+    """The profile's subscriptions, each marked as enabled or not, to pick from."""
+    subscribed = await subscribed_channels(session, profile)
+    listed = {channel.id for channel in subscribed}
+    # Channels still enabled after unsubscribing stay listed, so they can be turned off.
+    others = await session.scalars(
+        select(Channel).where(Channel.id.in_(enabled - listed)).order_by(Channel.name)
+    )
+    return [
+        ChannelChoiceOut(**channel.model_dump(), enabled=channel.id in enabled)
+        for channel in subscribed
+    ] + [
+        ChannelChoiceOut(
+            id=channel.id,
+            name=channel.name,
+            handle=channel.handle,
+            avatar_url=avatar_url_of(channel),
+            enabled=True,
+        )
+        for channel in others
+    ]
+
+
+async def known_channel_ids(session: SessionDep, channel_ids: Iterable[str]) -> set[str]:
+    return set(await session.scalars(select(Channel.id).where(Channel.id.in_(set(channel_ids)))))
 
 
 async def _channel_list(session: SessionDep, profile: Profile, syncing: bool) -> ChannelList:
