@@ -117,5 +117,5 @@ function cachedFrames(src: string, chapters: Chapter[]) {
     const frame = frameCache.get(`${src}#${chapter.start}`);
     if (frame) frames[chapter.start] = frame;
   }
-  return cachedFrames(src, chapters);
+  return frames;
 }
