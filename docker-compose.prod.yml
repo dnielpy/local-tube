@@ -40,6 +40,8 @@ services:
       DOWNLOAD_CONCURRENCY: ${DOWNLOAD_CONCURRENCY:-1}
       DEFAULT_MAX_HEIGHT: ${DEFAULT_MAX_HEIGHT:-360}
       TZ: ${TZ:-America/Havana}
+    ports:
+      - "${API_PORT:-3005}:8000"
     volumes:
       # The folder on the external drive where the videos are kept. With the drive unmounted the
       # api fails to start instead of filling the system disk with videos.
@@ -69,7 +71,8 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "${PORT:-80}:80"
+      # The web, with /api sent to the api
+      - "${WEB_PORT:-3004}:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

@@ -22,7 +22,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 
 To update a running deployment later, run `./scripts/update.sh`. It checks that `MEDIA_PATH` is there, stops the containers, runs `git pull`, and builds and starts them again, waiting until they are healthy. The build also fetches the latest yt-dlp, once a day at most. The database, the profiles with their cookies and the videos are kept.
 
-LocalTube is now at `http://<server-ip>` (or the `PORT` you chose). Caddy is the only exposed service. It sends `/api/*` to FastAPI and everything else to Next.js.
+LocalTube is now at `http://<server-ip>:3004` (`WEB_PORT`). Caddy serves it and sends `/api/*` to FastAPI and everything else to Next.js. The api is also exposed alone on `API_PORT` (3005).
 
 Videos are saved under `MEDIA_PATH/<youtube id>/video.mp4`, next to their `thumbnail.jpg`. The database stores the paths relative to that folder, so the drive can be mounted somewhere else later.
 
