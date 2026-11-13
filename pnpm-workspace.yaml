@@ -4,3 +4,10 @@ packages:
 allowBuilds:
   sharp: false
   unrs-resolver: false
+
+# The registry can be very slow from home: wait longer and retry instead of failing the install.
+fetchTimeout: 600000
+fetchRetries: 5
+fetchRetryMintimeout: 20000
+fetchRetryMaxtimeout: 120000
+networkConcurrency: 4
