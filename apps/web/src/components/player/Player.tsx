@@ -1,13 +1,23 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 
 import type { Video } from "@/lib/api";
+import { chapterAt, type Chapter } from "@/lib/chapters";
 import { formatDuration } from "@/lib/format";
 import { resumePosition, useRecordWatch } from "@/lib/watch-progress";
 
 import {
+  ChevronRightIcon,
   FullscreenExitIcon,
   FullscreenIcon,
   NextIcon,
@@ -31,6 +41,9 @@ const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 type Bezel = { id: number; kind: "play" | "pause" } | null;
 type Toast = { id: number; text: string; side?: "left" | "right" } | null;
 
+/** What the page around the player can do with it, like the description's timestamps. */
+export type PlayerHandle = { seekTo: (time: number) => void };
+
 function readVolume(): { volume: number; muted: boolean } {
   try {
     const saved = JSON.parse(localStorage.getItem(VOLUME_KEY) ?? "null");
@@ -44,11 +57,21 @@ export function Player({
   theater,
   onToggleTheater,
   onNext,
+  chapters,
+  startAt,
+  onChapterChange,
+  onOpenChapters,
+  ref,
 }: {
   video: Video;
   theater: boolean;
   onToggleTheater: () => void;
   onNext?: () => void;
+  chapters: Chapter[];
+  startAt?: number;
+  onChapterChange?: (index: number) => void;
+  onOpenChapters?: () => void;
+  ref?: Ref<PlayerHandle>;
 }) {
   const queryClient = useQueryClient();
   const recordWatch = useRecordWatch();
@@ -95,6 +118,39 @@ export function Player({
     v.currentTime = Math.min(Math.max(time, 0), v.duration);
     setCurrent(v.currentTime);
   }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      seekTo: (time: number) => {
+        seekTo(time);
+        el()
+          ?.play()
+          .catch(() => {});
+      },
+    }),
+    [seekTo],
+  );
+
+  const chapterIndex = chapterAt(chapters, current);
+  const chapter = chapterIndex >= 0 ? chapters[chapterIndex] : null;
+
+  useEffect(() => {
+    onChapterChange?.(chapterIndex);
+  }, [chapterIndex, onChapterChange]);
+
+  const seekChapter = useCallback(
+    (delta: number) => {
+      const v = el();
+      if (!v || chapters.length === 0) return false;
+      const target = chapters[chapterAt(chapters, v.currentTime) + delta];
+      if (!target) return false;
+      seekTo(target.start);
+      if (target.title) flashToast(target.title);
+      return true;
+    },
+    [chapters, seekTo, flashToast],
+  );
 
   const seekBy = useCallback(
     (delta: number) => {
@@ -187,7 +243,9 @@ export function Player({
     setDuration(v.duration);
     v.playbackRate = rate;
     // Start where the profile left the video, as YouTube does.
-    resumePosition(queryClient, video.id).then((start) => {
+    const start =
+      startAt != null ? Promise.resolve(startAt) : resumePosition(queryClient, video.id);
+    start.then((start) => {
       if (start > 0 && start < v.duration) v.currentTime = start;
       v.play().catch(() => {});
     });
@@ -214,6 +272,15 @@ export function Player({
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement;
       if (target.closest("input, textarea, [contenteditable=true]")) return;
+      // Ctrl + arrows jump between chapters, as on YouTube.
+      if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        const delta = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+        if (delta && seekChapter(delta)) {
+          event.preventDefault();
+          showControls();
+        }
+        return;
+      }
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const v = el();
       if (!v) return;
@@ -301,6 +368,7 @@ export function Player({
     changeRate,
     flashToast,
     showControls,
+    seekChapter,
   ]);
 
   const lastTap = useRef(0);
@@ -433,7 +501,13 @@ export function Player({
         />
 
         <div className="relative px-3">
-          <ProgressBar current={current} duration={duration} buffered={buffered} onSeek={seekTo} />
+          <ProgressBar
+            current={current}
+            duration={duration}
+            buffered={buffered}
+            chapters={chapters}
+            onSeek={seekTo}
+          />
           <div className="flex h-12 items-center text-white">
             <ControlButton
               label={ended ? "Volver a ver" : playing ? "Pausar (k)" : "Reproducir (k)"}
@@ -483,7 +557,20 @@ export function Player({
               <span className="text-white/90">{formatDuration(duration)}</span>
             </div>
 
-            <div className="ml-auto flex items-center">
+            {chapter && (
+              <button
+                type="button"
+                onClick={onOpenChapters}
+                aria-label={`Ver capítulo: ${chapter.title}`}
+                className="flex h-12 min-w-0 items-center text-[13px] text-white/90 [text-shadow:0_0_2px_rgba(0,0,0,.5)] hover:text-white"
+              >
+                <span className="px-[5px]">•</span>
+                <span className="truncate">{chapter.title}</span>
+                <ChevronRightIcon size={20} className="shrink-0" />
+              </button>
+            )}
+
+            <div className="ml-auto flex shrink-0 items-center">
               <ControlButton
                 label="Configuración"
                 onClick={() => setSettingsOpen((value) => !value)}

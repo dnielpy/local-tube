@@ -3,22 +3,24 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { browser } from "react-dom";
 
 import { api, queryKeys, type PlaylistDetail, type Video } from "@/lib/api";
+import { parseChapters, useChapterFrames, type Chapter } from "@/lib/chapters";
 import { channelHref } from "@/lib/format";
 import { useDeleteVideo } from "@/lib/use-delete-video";
 import { useLike } from "@/lib/use-playlists";
 
 import { ChannelPhoto } from "./ChannelPhoto";
+import { ChaptersPanel } from "./ChaptersPanel";
 import { Description } from "./Description";
 import { ConfirmDialog } from "./Dialog";
 import { DownloadIcon, ExternalIcon, LikeFilledIcon, LikeIcon, SaveIcon, TrashIcon } from "./icons";
 import { playHref } from "./library/PlaylistView";
 import { SaveDialog } from "./library/SaveDialog";
 import { VideoRow } from "./library/VideoRow";
-import { Player } from "./player/Player";
+import { Player, type PlayerHandle } from "./player/Player";
 import { WatchNext, WatchNextSkeleton } from "./WatchNext";
 
 const THEATER_KEY = "localtube:theater";
@@ -28,6 +30,8 @@ export function WatchView() {
   const params = useSearchParams();
   const id = params.get("v") ?? "";
   const listId = params.get("list");
+  // ?t=90s or ?t=90, the link a description timestamp copies, as on YouTube.
+  const startAt = Number.parseInt(params.get("t") ?? "", 10) || undefined;
   const router = useRouter();
   const playlist = useQuery({
     queryKey: queryKeys.playlist(listId ?? ""),
@@ -50,6 +54,33 @@ export function WatchView() {
       return false;
     }
   });
+
+  const playerRef = useRef<PlayerHandle>(null);
+  const [chaptersOpen, setChaptersOpen] = useState(false);
+  const [wantFrames, setWantFrames] = useState(false);
+  const [chapterIndex, setChapterIndex] = useState(-1);
+  const chapters = useMemo(
+    () => (video.data ? parseChapters(video.data.description, video.data.duration_seconds) : []),
+    [video.data],
+  );
+  const frames = useChapterFrames(
+    video.data?.stream_url ?? "",
+    chapters,
+    wantFrames || chaptersOpen,
+  );
+
+  // Another video starts with the panel closed, as on YouTube.
+  const [shownId, setShownId] = useState(id);
+  if (shownId !== id) {
+    setShownId(id);
+    setChaptersOpen(false);
+    setWantFrames(false);
+  }
+
+  const seekTo = useCallback((time: number) => {
+    playerRef.current?.seekTo(time);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   useEffect(() => {
     if (video.data) document.title = `${video.data.title} - LocalTube`;
@@ -93,6 +124,11 @@ export function WatchView() {
       theater={theater}
       onToggleTheater={toggleTheater}
       onNext={nextHref ? () => router.push(nextHref) : undefined}
+      chapters={chapters}
+      startAt={startAt}
+      onChapterChange={setChapterIndex}
+      onOpenChapters={() => setChaptersOpen(true)}
+      ref={playerRef}
     />
   ) : (
     <div className="aspect-video w-full bg-black search:rounded-xl" />
@@ -100,6 +136,16 @@ export function WatchView() {
 
   const secondary = (
     <>
+      {chaptersOpen && chapters.length > 0 && video.data && (
+        <ChaptersPanel
+          chapters={chapters}
+          frames={frames}
+          thumbnail={video.data.thumbnail_url}
+          current={chapterIndex}
+          onSeek={(time) => playerRef.current?.seekTo(time)}
+          onClose={() => setChaptersOpen(false)}
+        />
+      )}
       {playlist.data && <PlaylistPanel playlist={playlist.data} current={id} />}
       {library.isPending ? <WatchNextSkeleton /> : <WatchNext videos={others} />}
     </>
@@ -109,7 +155,18 @@ export function WatchView() {
     <div data-watch className="watch-layout" data-theater={theater}>
       <div data-area="player">{player}</div>
       <div data-area="info" className="min-w-0 px-3 search:px-0">
-        {video.data ? <VideoInfo video={video.data} /> : <InfoSkeleton />}
+        {video.data ? (
+          <VideoInfo
+            video={video.data}
+            chapters={chapters}
+            frames={frames}
+            onExpand={() => setWantFrames(true)}
+            onSeek={seekTo}
+            onShowChapters={() => setChaptersOpen(true)}
+          />
+        ) : (
+          <InfoSkeleton />
+        )}
       </div>
       <aside data-area="secondary" className="px-3 pb-6 search:px-0">
         {secondary}
@@ -118,7 +175,17 @@ export function WatchView() {
   );
 }
 
-function VideoInfo({ video }: { video: Video }) {
+function VideoInfo({
+  video,
+  ...description
+}: {
+  video: Video;
+  chapters: Chapter[];
+  frames: Record<number, string>;
+  onExpand: () => void;
+  onSeek: (time: number) => void;
+  onShowChapters: () => void;
+}) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -154,7 +221,7 @@ function VideoInfo({ video }: { video: Video }) {
           </button>
         </div>
       </div>
-      <Description video={video} />
+      <Description video={video} {...description} />
       {saving && <SaveDialog video={video} onClose={() => setSaving(false)} />}
       <ConfirmDialog
         open={confirming}
