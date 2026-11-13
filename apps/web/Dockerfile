@@ -1,9 +1,18 @@
 FROM node:24-bookworm-slim AS build
-RUN npm install -g pnpm@11.25.0
+# The registry can be very slow from home: wait longer and retry instead of failing
+RUN npm install --global pnpm@11.25.0 \
+    --fetch-retries=8 \
+    --fetch-retry-factor=2 \
+    --fetch-retry-mintimeout=20000 \
+    --fetch-retry-maxtimeout=180000 \
+    --fetch-timeout=300000
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
-RUN pnpm install --frozen-lockfile --filter web
+# The packages are kept in a BuildKit cache between builds, so a failed install resumes from what it already
+# downloaded. The same store as the other projects on the server, which share most packages.
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter web --store-dir /pnpm/store
 COPY apps/web apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter web build
