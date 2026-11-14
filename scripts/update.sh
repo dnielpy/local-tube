@@ -1,5 +1,6 @@
 #!/bin/sh
-# Updates a production deployment: stops the containers, pulls the latest code and starts everything again.
+# Updates a production deployment: pulls the latest code and builds the images while the old containers keep
+# running, then stops them and starts the new ones, so the downtime is only the restart (builds are slow).
 # Usage, from anywhere: ./scripts/update.sh
 set -eu
 
@@ -20,14 +21,17 @@ if [ ! -d "$media_path" ]; then
     exit 1
 fi
 
-echo "==> Stopping containers"
-compose down
-
 echo "==> Pulling latest code"
 git pull --ff-only
 
-echo "==> Building and starting containers"
+echo "==> Building images"
 # A new value every day makes the build fetch the latest yt-dlp.
-YTDLP_REFRESH=$(date +%Y-%m-%d) compose up -d --build --wait
+YTDLP_REFRESH=$(date +%Y-%m-%d) compose build
+
+echo "==> Stopping containers"
+compose down
+
+echo "==> Starting containers"
+compose up -d --wait
 
 compose ps

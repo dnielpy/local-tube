@@ -20,7 +20,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 
 `MEDIA_PATH` must exist before the containers start. If the drive is not mounted, the api refuses to start instead of saving the videos on the system disk. Mount the drive at boot (for example with an `/etc/fstab` entry using `nofail`) so LocalTube finds it after a restart.
 
-To update a running deployment later, run `./scripts/update.sh`. It checks that `MEDIA_PATH` is there, stops the containers, runs `git pull`, and builds and starts them again, waiting until they are healthy. The build also fetches the latest yt-dlp, once a day at most. The database, the profiles with their cookies and the videos are kept.
+To update a running deployment later, run `./scripts/update.sh`. It checks that `MEDIA_PATH` is there, runs `git pull`, builds the images while the old containers keep running, then stops them and starts the new ones, waiting until they are healthy. The build also fetches the latest yt-dlp, once a day at most. The database, the profiles with their cookies and the videos are kept.
 
 LocalTube is now at `http://<server-ip>:3004` (`WEB_PORT`). Caddy serves it and sends `/api/*` to FastAPI and everything else to Next.js. The api is also exposed alone on `API_PORT` (3005).
 
