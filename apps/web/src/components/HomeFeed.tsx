@@ -19,14 +19,14 @@ export const GRID =
   "grid grid-cols-1 gap-x-4 gap-y-10 xs:grid-cols-2 grid3:grid-cols-3 grid4:grid-cols-4 grid5:grid-cols-5";
 
 /**
- * Online, with channels chosen for the feed, the home page shows the latest video of each of
- * them. Offline, or when "Todos" is chosen, it shows the downloaded videos.
+ * The home page shows the downloaded videos. With the feed turned on (`?view=feed`), online and
+ * with channels chosen for it, it shows the latest video of each of them instead.
  */
 export function HomeFeed() {
   use(browser("Library data is fetched from the api in the browser."));
   const params = useSearchParams();
   const channel = params.get("channel") ?? undefined;
-  const wantsLibrary = channel !== undefined || params.get("view") === "library";
+  const wantsLibrary = channel !== undefined || params.get("view") !== "feed";
   const status = useStatus();
   const online = status.data?.online ?? false;
   const feed = useFeed();
@@ -137,11 +137,11 @@ function ChipBar({
   active?: string;
   feed?: { selected: boolean };
 }) {
-  const chips = (feed ? [{ label: "Feed", href: "/", selected: feed.selected }] : [])
+  const chips = (feed ? [{ label: "Feed", href: "/?view=feed", selected: feed.selected }] : [])
     .concat([
       {
         label: "Todos",
-        href: feed ? "/?view=library" : "/",
+        href: "/",
         selected: !active && !feed?.selected,
       },
     ])
