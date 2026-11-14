@@ -16,11 +16,20 @@ import { ChannelPhoto } from "./ChannelPhoto";
 import { ChaptersPanel } from "./ChaptersPanel";
 import { Description } from "./Description";
 import { ConfirmDialog } from "./Dialog";
-import { DownloadIcon, ExternalIcon, LikeFilledIcon, LikeIcon, SaveIcon, TrashIcon } from "./icons";
+import {
+  DownloadIcon,
+  ExternalIcon,
+  LikeFilledIcon,
+  LikeIcon,
+  SaveIcon,
+  ShareIcon,
+  TrashIcon,
+} from "./icons";
 import { playHref } from "./library/PlaylistView";
 import { SaveDialog } from "./library/SaveDialog";
 import { VideoRow } from "./library/VideoRow";
 import { Player, type PlayerHandle } from "./player/Player";
+import { ShareDialog } from "./ShareDialog";
 import { WatchNext, WatchNextSkeleton } from "./WatchNext";
 
 const THEATER_KEY = "localtube:theater";
@@ -189,6 +198,7 @@ function VideoInfo({
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const remove = useDeleteVideo(() => router.push("/"));
   const pill =
     "flex h-9 shrink-0 items-center gap-[6px] rounded-full bg-yt-surface px-4 text-sm font-medium hover:bg-yt-surface-hover";
@@ -207,6 +217,10 @@ function VideoInfo({
             <SaveIcon />
             Guardar
           </button>
+          <button type="button" onClick={() => setSharing(true)} className={pill}>
+            <ShareIcon />
+            Compartir
+          </button>
           <a href={video.youtube_url} target="_blank" rel="noreferrer" className={pill}>
             <ExternalIcon />
             YouTube
@@ -223,6 +237,7 @@ function VideoInfo({
       </div>
       <Description video={video} {...description} />
       {saving && <SaveDialog video={video} onClose={() => setSaving(false)} />}
+      {sharing && <ShareDialog video={video} onClose={() => setSharing(false)} />}
       <ConfirmDialog
         open={confirming}
         title="¿Eliminar video?"

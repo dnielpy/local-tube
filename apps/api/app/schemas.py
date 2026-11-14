@@ -158,6 +158,45 @@ class ProfileOut(BaseModel):
     youtube_name: str | None
 
 
+class ShareOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+
+    @computed_field
+    @property
+    def url(self) -> str:
+        return f"/share/{self.id}"
+
+
+class SharedByOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    avatar_url: str | None
+
+
+class SharedVideoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    channel: str | None
+    channel_avatar_url: str | None = None
+    duration_seconds: int | None
+
+
+class SharePreviewOut(BaseModel):
+    id: uuid.UUID
+    shared_by: SharedByOut
+    video: SharedVideoOut
+    # The video of a share is outside the library of whoever opens it, so its thumbnail is served
+    # through the share.
+    thumbnail_url: str | None
+    in_library: bool
+
+
 COOKIES_MAX_LENGTH = 200_000
 
 

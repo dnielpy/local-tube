@@ -24,6 +24,8 @@ export type AutoDownloadSettings = components["schemas"]["AutoDownloadSettings"]
 export type Feed = components["schemas"]["FeedOut"];
 export type FeedItem = components["schemas"]["FeedItemOut"];
 export type FeedSettings = components["schemas"]["FeedSettings"];
+export type Share = components["schemas"]["ShareOut"];
+export type SharePreview = components["schemas"]["SharePreviewOut"];
 
 export class ApiError extends Error {
   constructor(
@@ -121,6 +123,9 @@ export const api = {
   removeFromPlaylist: (id: string, videoId: string) =>
     request<void>(`/playlists/${id}/videos/${videoId}`, { method: "DELETE" }),
   deleteVideo: (id: string) => request<void>(`/videos/${id}`, { method: "DELETE" }),
+  shareVideo: (id: string) => request<Share>(`/videos/${id}/share`, { method: "POST" }),
+  share: (id: string) => request<SharePreview>(`/shares/${id}`),
+  saveShare: (id: string) => request<Video>(`/shares/${id}/save`, { method: "POST" }),
   downloads: () => request<DownloadJob[]>("/downloads"),
   formats: (url: string, signal?: AbortSignal) =>
     request<VideoFormats>(`/downloads/formats?url=${encodeURIComponent(url)}`, { signal }),
@@ -190,6 +195,7 @@ export const queryKeys = {
   channel: (id: string) => ["channel", id] as const,
   allChannels: ["channel"] as const,
   video: (id: string) => ["video", id] as const,
+  share: (id: string) => ["share", id] as const,
   downloads: ["downloads"] as const,
   formats: (url: string) => ["formats", url] as const,
   autoDownloadChannels: ["auto-download-channels"] as const,

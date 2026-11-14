@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -186,6 +187,21 @@ class WatchEvent(Base):
     video_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"))
     seconds: Mapped[float] = mapped_column(Float)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class VideoShare(Base):
+    """A link a profile made to offer a video of its library to the other profiles."""
+
+    __tablename__ = "video_shares"
+    __table_args__ = (UniqueConstraint("video_id", "profile_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    video_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"))
+    profile_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    video: Mapped[Video] = relationship(lazy="selectin")
+    profile: Mapped[Profile] = relationship(lazy="selectin")
 
 
 class PlaylistKind(enum.StrEnum):

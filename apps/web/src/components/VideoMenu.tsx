@@ -7,13 +7,15 @@ import { useDeleteVideo } from "@/lib/use-delete-video";
 import { useWatchLater } from "@/lib/use-playlists";
 
 import { ConfirmDialog } from "./Dialog";
-import { ExternalIcon, MoreIcon, SaveIcon, TrashIcon, WatchLaterIcon } from "./icons";
+import { ExternalIcon, MoreIcon, SaveIcon, ShareIcon, TrashIcon, WatchLaterIcon } from "./icons";
 import { SaveDialog } from "./library/SaveDialog";
+import { ShareDialog } from "./ShareDialog";
 
 export function VideoMenu({ video, className = "" }: { video: Video; className?: string }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const remove = useDeleteVideo(() => setConfirming(false));
 
@@ -58,6 +60,18 @@ export function VideoMenu({ video, className = "" }: { video: Video; className?:
             <SaveIcon />
             Guardar en una lista
           </button>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setSharing(true);
+            }}
+            className="flex h-9 w-full items-center gap-4 pr-6 pl-4 text-left text-sm hover:bg-yt-surface"
+          >
+            <ShareIcon />
+            Compartir
+          </button>
           <div className="my-2 border-t border-yt-divider" />
           <a
             role="menuitem"
@@ -85,6 +99,7 @@ export function VideoMenu({ video, className = "" }: { video: Video; className?:
         </div>
       )}
       {saving && <SaveDialog video={video} onClose={() => setSaving(false)} />}
+      {sharing && <ShareDialog video={video} onClose={() => setSharing(false)} />}
       <ConfirmDialog
         open={confirming}
         title="¿Eliminar video?"

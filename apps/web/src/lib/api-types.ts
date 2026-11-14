@@ -640,10 +640,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/downloads/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["active_downloads_api_stats_downloads_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/watch-time": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["watch_time_api_stats_watch_time_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/videos/{video_id}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["share_video_api_videos__video_id__share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shares/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_share_api_shares__share_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shares/{share_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["share_thumbnail_api_shares__share_id__thumbnail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shares/{share_id}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["save_share_api_shares__share_id__save_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActiveDownloadOut: {
+            id: string;
+            title: string | null;
+            status: components["schemas"]["JobStatus"];
+            progress: number;
+            speed: string | null;
+            eta: string | null;
+        };
+        ActiveDownloadsOut: {
+            count: number;
+            items: components["schemas"]["ActiveDownloadOut"][];
+        };
         AutoDownloadSettings: {
             max_height: number;
             start_time?: string | null;
@@ -821,6 +929,29 @@ export interface components {
             items: components["schemas"]["RemoteVideoOut"][];
             has_more: boolean;
         };
+        ShareOut: {
+            id: string;
+            readonly url: string;
+        };
+        SharePreviewOut: {
+            id: string;
+            shared_by: components["schemas"]["SharedByOut"];
+            video: components["schemas"]["SharedVideoOut"];
+            thumbnail_url: string | null;
+            in_library: boolean;
+        };
+        SharedByOut: {
+            id: string;
+            name: string;
+            avatar_url: string | null;
+        };
+        SharedVideoOut: {
+            id: string;
+            title: string;
+            channel: string | null;
+            channel_avatar_url?: string | null;
+            duration_seconds: number | null;
+        };
         StatusOut: {
             online: boolean;
             reachable: boolean;
@@ -873,6 +1004,12 @@ export interface components {
             video_id: string;
             position: number;
             duration: number | null;
+        };
+        WatchTimeOut: {
+            profile_id: string;
+            name: string;
+            avatar_url: string | null;
+            seconds: number;
         };
     };
     responses: never;
@@ -2547,6 +2684,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    active_downloads_api_stats_downloads_active_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-service-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveDownloadsOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watch_time_api_stats_watch_time_get: {
+        parameters: {
+            query?: {
+                hours?: number | null;
+            };
+            header?: {
+                "x-service-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchTimeOut"][];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_video_api_videos__video_id__share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_share_api_shares__share_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharePreviewOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_thumbnail_api_shares__share_id__thumbnail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_share_api_shares__share_id__save_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: {
+                localtube_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoOut"];
                 };
             };
             422: {
