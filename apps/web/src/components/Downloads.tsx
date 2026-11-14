@@ -16,9 +16,9 @@ import {
   CheckIcon,
   CloseIcon,
   DownloadIcon,
+  PauseIcon,
+  PlayIcon,
   RetryIcon,
-  StopFilledIcon,
-  StopIcon,
   TrashIcon,
 } from "./icons";
 
@@ -150,7 +150,7 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   processing: "Procesando",
   completed: "Completado",
   failed: "Error",
-  cancelled: "Cancelada",
+  cancelled: "Pausada",
 };
 
 function JobRow({ job }: { job: DownloadJob }) {
@@ -215,12 +215,20 @@ function JobRow({ job }: { job: DownloadJob }) {
 
   const details = [
     active && (cancel.isPending || cancel.isSuccess)
-      ? "Parando…"
-      : job.status === "queued" && job.start_at && new Date(job.start_at) > new Date()
-        ? `Programado · ${formatClock(job.start_at)}`
-        : STATUS_LABEL[job.status],
+      ? "Pausando…"
+      : job.status === "queued" && job.retry_at && new Date(job.retry_at) > new Date()
+        ? `Reintentando · ${formatClock(job.retry_at)}`
+        : job.status === "queued" && job.error?.startsWith("Sin conexión")
+          ? "Esperando conexión"
+          : job.status === "queued" && job.start_at && new Date(job.start_at) > new Date()
+            ? `Programado · ${formatClock(job.start_at)}`
+            : STATUS_LABEL[job.status],
     job.max_height ? `${job.max_height}p` : "Máxima",
   ];
+  // The partial files are kept, so a stopped download continues from here.
+  if (job.status !== "downloading" && job.status !== "completed" && job.progress > 0) {
+    details.push(`Descargado ${Math.round(job.progress)}%`);
+  }
   if (job.status === "downloading") {
     details.push(`${Math.round(job.progress)}%`);
     if (job.speed) details.push(job.speed);
@@ -268,20 +276,20 @@ function JobRow({ job }: { job: DownloadJob }) {
       <div className="flex shrink-0 items-center">
         {active && (
           <IconButton
-            label="Parar descarga"
+            label="Pausar descarga"
             disabled={cancel.isPending || cancel.isSuccess}
             onClick={() => cancel.mutate(job.id)}
           >
-            <StopIcon />
+            <PauseIcon />
           </IconButton>
         )}
         {(job.status === "failed" || job.status === "cancelled") && (
           <IconButton
-            label="Reintentar"
+            label={job.status === "cancelled" ? "Reanudar" : "Reintentar"}
             disabled={retry.isPending}
             onClick={() => retry.mutate(job.id)}
           >
-            <RetryIcon />
+            {job.status === "cancelled" ? <PlayIcon /> : <RetryIcon />}
           </IconButton>
         )}
         {!active && (
@@ -319,11 +327,11 @@ function ProgressCircle({
       type="button"
       onClick={onStop}
       disabled={stopping}
-      title={stopping ? "Parando…" : "Parar descarga"}
+      title={stopping ? "Pausando…" : "Pausar descarga"}
       aria-label={
         stopping
-          ? "Parando la descarga"
-          : `Parar descarga${indeterminate ? "" : `, ${Math.round(progress)}%`}`
+          ? "Pausando la descarga"
+          : `Pausar descarga${indeterminate ? "" : `, ${Math.round(progress)}%`}`
       }
       className="group/stop relative flex size-11 items-center justify-center disabled:opacity-70"
     >
@@ -362,7 +370,7 @@ function ProgressCircle({
           <DownloadIcon size={20} />
         </span>
         <span className="hidden group-hover/stop:block group-disabled/stop:block">
-          <StopFilledIcon size={16} />
+          <PauseIcon size={24} />
         </span>
       </span>
     </button>

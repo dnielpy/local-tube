@@ -275,6 +275,11 @@ class DownloadJob(Base):
     max_height: Mapped[int | None] = mapped_column(Integer)
     # A queued job waits until then, for downloads scheduled at a later hour.
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Failed attempts in a row without progress; a transient error waits until retry_at.
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The formats picked on the first attempt ("134+140"), so retries continue the same files.
+    format_id: Mapped[str | None] = mapped_column(Text)
     thumbnail_path: Mapped[str | None] = mapped_column(Text)
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger)

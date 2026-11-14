@@ -823,6 +823,8 @@ export interface components {
             title: string | null;
             max_height: number | null;
             start_at?: string | null;
+            attempts: number;
+            retry_at?: string | null;
             duration_seconds: number | null;
             size_bytes: number | null;
             video_id: string | null;

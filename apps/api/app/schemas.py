@@ -85,6 +85,8 @@ class DownloadJobOut(BaseModel):
     title: str | None
     max_height: int | None
     start_at: datetime | None = None
+    attempts: int = 0
+    retry_at: datetime | None = None
     duration_seconds: int | None
     size_bytes: int | None
     video_id: uuid.UUID | None

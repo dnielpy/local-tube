@@ -9,10 +9,11 @@ import { channelHref, formatCount, formatDuration, timeAgo } from "@/lib/format"
 import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
 
 import { ChannelPhoto } from "./ChannelPhoto";
-import { CheckIcon, DownloadIcon, ExternalIcon, RetryIcon, StopFilledIcon } from "./icons";
+import { CheckIcon, DownloadIcon, ExternalIcon, PauseIcon, PlayIcon, RetryIcon } from "./icons";
 import { QualityDialog } from "./QualityDialog";
 
 function jobLabel(job: DownloadJob): string {
+  if (job.status === "queued" && job.retry_at) return "Reintentando…";
   if (job.status === "queued") return "En cola";
   if (job.status === "processing") return "Procesando…";
   return `Descargando ${Math.round(job.progress)}%`;
@@ -135,7 +136,7 @@ export function RemoteVideoCard({
                 {active ? (
                   <>
                     <span className={`${pill} bg-yt-surface text-yt-text-secondary`}>
-                      {cancel.isPending || cancel.isSuccess ? "Parando…" : jobLabel(job)}
+                      {cancel.isPending || cancel.isSuccess ? "Pausando…" : jobLabel(job)}
                     </span>
                     <button
                       type="button"
@@ -143,10 +144,20 @@ export function RemoteVideoCard({
                       onClick={() => cancel.mutate(job.id)}
                       className={`${pill} bg-yt-surface hover:bg-yt-surface-hover disabled:opacity-50`}
                     >
-                      <StopFilledIcon size={16} />
-                      Parar
+                      <PauseIcon size={22} />
+                      Pausar
                     </button>
                   </>
+                ) : job?.status === "cancelled" ? (
+                  <button
+                    type="button"
+                    disabled={retry.isPending}
+                    onClick={() => retry.mutate(job.id)}
+                    className={`${pill} bg-yt-surface hover:bg-yt-surface-hover`}
+                  >
+                    <PlayIcon size={22} />
+                    Reanudar
+                  </button>
                 ) : job?.status === "failed" ? (
                   <button
                     type="button"

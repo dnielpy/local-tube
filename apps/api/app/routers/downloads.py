@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.db import SessionDep
-from app.media import media_path
+from app.media import media_path, remove_video_dir
 from app.models import DownloadJob, JobStatus, Profile, Video
 from app.schemas import DownloadCreate, DownloadJobOut, QualityOut, VideoFormatsOut
 from app.services.connectivity import connectivity
@@ -195,9 +195,11 @@ async def retry_download(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Only failed or cancelled downloads can be retried"
         )
+    # The progress stays: the download continues from the partial files.
     job.status = JobStatus.queued
-    job.progress = 0
     job.error = None
+    job.attempts = 0
+    job.retry_at = None
     await session.commit()
     await session.refresh(job)
     if worker is not None:
@@ -228,3 +230,18 @@ async def delete_download(session: SessionDep, profile: ProfileDep, job_id: uuid
         raise HTTPException(status.HTTP_409_CONFLICT, "Cannot remove a download in progress")
     await session.delete(job)
     await session.commit()
+    if job.youtube_id and job.status != JobStatus.completed:
+        await _remove_partial_files(session, job.youtube_id)
+
+
+async def _remove_partial_files(session: SessionDep, youtube_id: str) -> None:
+    """A paused or failed download keeps its partial files until it is removed."""
+    downloaded = await session.scalar(select(Video.id).where(Video.youtube_id == youtube_id))
+    others = await session.scalar(
+        select(DownloadJob.id).where(
+            DownloadJob.youtube_id == youtube_id,
+            DownloadJob.status.not_in((JobStatus.completed,)),
+        )
+    )
+    if downloaded is None and others is None:
+        remove_video_dir(youtube_id)

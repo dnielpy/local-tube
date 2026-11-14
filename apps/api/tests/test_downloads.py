@@ -1,6 +1,8 @@
 import asyncio
+import errno
 import threading
 import time
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -14,23 +16,40 @@ from app.services.downloader import (
     DownloadResult,
     Probe,
     Progress,
+    YtDlpDownloader,
     clean_error,
+    finish_complete_parts,
     format_selector,
+    is_transient,
 )
-from app.services.worker import DownloadWorker, format_eta, format_speed, requeue_interrupted_jobs
+from app.services.worker import (
+    MAX_ATTEMPTS,
+    DownloadWorker,
+    format_eta,
+    format_speed,
+    requeue_interrupted_jobs,
+)
 
 URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 class FakeDownloader:
-    def __init__(self, media_root, fail_with: str | None = None) -> None:
+    def __init__(
+        self,
+        media_root,
+        fail_with: str | None = None,
+        transient: bool = False,
+        progress: float = 50,
+    ) -> None:
         self.media_root = media_root
         self.fail_with = fail_with
+        self.transient = transient
+        self.progress = progress
         self.downloads = 0
 
     def probe(self, url: str, cookies_file=None) -> Probe:
         self.cookies_file = cookies_file
-        if self.fail_with:
+        if self.fail_with and not self.transient:
             raise DownloadError(self.fail_with)
         return Probe(youtube_id="dQw4w9WgXcQ", title="Never Gonna Give You Up", info={})
 
@@ -41,10 +60,25 @@ class FakeDownloader:
         max_height=None,
         should_cancel=lambda: False,
         cookies_file=None,
+        format_id=None,
     ) -> DownloadResult:
         self.downloads += 1
         self.max_height = max_height
-        on_progress(Progress("downloading", percent=50, speed=2 * 1024 * 1024, eta=30))
+        self.format_id = format_id
+        directory = self.media_root / probe.youtube_id
+        directory.mkdir(parents=True, exist_ok=True)
+        on_progress(
+            Progress(
+                "downloading",
+                percent=self.progress,
+                speed=2 * 1024 * 1024,
+                eta=30,
+                format_id="134+140",
+            )
+        )
+        if self.fail_with:
+            (directory / "video.f134.mp4.part").write_bytes(b"partial")
+            raise DownloadError(self.fail_with, transient=True)
         directory = self.media_root / probe.youtube_id
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "video.mp4").write_bytes(b"video")
@@ -183,7 +217,7 @@ async def test_interrupted_jobs_are_requeued(client, profile):
 
     requeued = (await client.get(f"/api/downloads/{job.id}")).json()
     assert requeued["status"] == "queued"
-    assert requeued["progress"] == 0
+    assert requeued["progress"] == 40
 
 
 @pytest.mark.parametrize(
@@ -287,7 +321,7 @@ async def test_cancel_queued_download(client, media_root):
     assert await DownloadWorker(FakeDownloader(media_root)).run_once() is False
 
 
-async def test_cancel_running_download_stops_it_and_removes_partial_files(client, media_root):
+async def test_pausing_a_running_download_keeps_the_partial_files(client, media_root):
     job = (await client.post("/api/downloads", json={"url": URL})).json()
     downloader = SlowDownloader(media_root)
     worker = DownloadWorker(downloader)
@@ -304,8 +338,11 @@ async def test_cancel_running_download_stops_it_and_removes_partial_files(client
     assert response.status_code == 200
     done = (await client.get(f"/api/downloads/{job['id']}")).json()
     assert done["status"] == "cancelled"
-    assert not (media_root / "dQw4w9WgXcQ").exists()
+    assert (media_root / "dQw4w9WgXcQ" / "video.mp4.part").read_bytes() == b"partial"
     assert (await client.get("/api/videos")).json()["total"] == 0
+
+    assert (await client.delete(f"/api/downloads/{job['id']}")).status_code == 204
+    assert not (media_root / "dQw4w9WgXcQ").exists()
 
 
 async def test_cancelled_download_can_be_retried(client, media_root):
@@ -324,3 +361,176 @@ async def test_cannot_cancel_finished_download(client, media_root):
     await DownloadWorker(FakeDownloader(media_root)).run_once()
 
     assert (await client.post(f"/api/downloads/{job['id']}/cancel")).status_code == 409
+
+
+async def _job(job_id) -> DownloadJob:
+    async with SessionLocal() as session:
+        return await session.get_one(DownloadJob, job_id)
+
+
+async def test_transient_error_is_retried_later_and_keeps_the_files(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    worker = DownloadWorker(FakeDownloader(media_root, "Read timed out", transient=True))
+
+    await worker.run_once()
+
+    retrying = (await client.get(f"/api/downloads/{job['id']}")).json()
+    assert retrying["status"] == "queued"
+    assert retrying["attempts"] == 1
+    assert retrying["error"].startswith("Reintentando (1/")
+    assert datetime.fromisoformat(retrying["retry_at"]) > datetime.now(UTC)
+    assert retrying["progress"] == 50
+    assert (media_root / "dQw4w9WgXcQ" / "video.f134.mp4.part").is_file()
+    # It waits for retry_at before trying again.
+    assert await worker.run_once() is False
+
+
+async def test_retry_continues_with_the_same_formats(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    await DownloadWorker(FakeDownloader(media_root, "Read timed out", transient=True)).run_once()
+    async with SessionLocal() as session, session.begin():
+        (await session.get_one(DownloadJob, job["id"])).retry_at = datetime.now(UTC)
+
+    downloader = FakeDownloader(media_root)
+    await DownloadWorker(downloader).run_once()
+
+    assert downloader.format_id == "134+140"
+    done = (await client.get(f"/api/downloads/{job['id']}")).json()
+    assert done["status"] == "completed"
+    assert done["attempts"] == 0
+    assert done["error"] is None
+
+
+async def test_permanent_error_fails_at_once(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+
+    await DownloadWorker(FakeDownloader(media_root, "Private video")).run_once()
+
+    failed = (await client.get(f"/api/downloads/{job['id']}")).json()
+    assert failed["status"] == "failed"
+    assert failed["retry_at"] is None
+
+
+async def test_error_while_offline_does_not_use_an_attempt(client, media_root):
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    downloader = FakeDownloader(media_root, "Connection reset", transient=True)
+
+    class GoesOffline(DownloadWorker):
+        async def run_once(self) -> bool:
+            original = downloader.download
+
+            def download(*args, **kwargs):
+                connectivity.forced_offline = True
+                return original(*args, **kwargs)
+
+            downloader.download = download
+            return await super().run_once()
+
+    try:
+        await GoesOffline(downloader).run_once()
+    finally:
+        connectivity.forced_offline = False
+
+    waiting = await _job(job["id"])
+    assert waiting.status == JobStatus.queued
+    assert waiting.attempts == 0
+    assert waiting.retry_at is None
+
+
+async def test_attempt_that_made_progress_starts_the_count_again(client, media_root, profile):
+    async with SessionLocal() as session:
+        job = DownloadJob(url=URL, progress=20, attempts=5, profile_id=profile.id)
+        session.add(job)
+        await session.commit()
+
+    await DownloadWorker(FakeDownloader(media_root, "Read timed out", transient=True)).run_once()
+
+    assert (await _job(job.id)).attempts == 1
+
+
+async def test_gives_up_after_attempts_without_progress_but_keeps_the_files(
+    client, media_root, profile
+):
+    async with SessionLocal() as session:
+        job = DownloadJob(url=URL, progress=50, attempts=MAX_ATTEMPTS - 1, profile_id=profile.id)
+        session.add(job)
+        await session.commit()
+
+    await DownloadWorker(FakeDownloader(media_root, "Read timed out", transient=True)).run_once()
+
+    failed = await _job(job.id)
+    assert failed.status == JobStatus.failed
+    assert failed.error == "Read timed out"
+    assert (media_root / "dQw4w9WgXcQ" / "video.f134.mp4.part").is_file()
+
+
+async def test_retry_keeps_the_progress_and_resets_the_attempts(client, profile):
+    async with SessionLocal() as session:
+        job = DownloadJob(
+            url=URL,
+            status=JobStatus.failed,
+            progress=70,
+            attempts=MAX_ATTEMPTS,
+            retry_at=datetime.now(UTC) + timedelta(hours=1),
+            profile_id=profile.id,
+        )
+        session.add(job)
+        await session.commit()
+
+    retried = (await client.post(f"/api/downloads/{job.id}/retry")).json()
+
+    assert retried["status"] == "queued"
+    assert retried["progress"] == 70
+    assert retried["attempts"] == 0
+    assert retried["retry_at"] is None
+
+
+@pytest.mark.parametrize(
+    ("error", "transient"),
+    [
+        ("ERROR: Unable to download video data: <urlopen error timed out>", True),
+        ("Got error: Read timed out.", True),
+        ("Unable to download video data: HTTP Error 403: Forbidden", True),
+        ("HTTP Error 503: Service Unavailable", True),
+        ("[Errno 54] Connection reset by peer", True),
+        ("[youtube] abc: Private video. Sign in if you've been granted access", False),
+        ("[youtube] abc: Video unavailable", False),
+        ("[youtube] abc: Sign in to confirm you're not a bot", False),
+        ("[youtube] abc: Join this channel to get access to members-only content", False),
+    ],
+)
+def test_is_transient(error, transient):
+    assert is_transient(Exception(error)) is transient
+
+
+def test_disk_full_is_not_transient():
+    assert not is_transient(OSError(errno.ENOSPC, "No space left on device"))
+
+
+def test_options_survive_a_weak_connection(media_root):
+    options = YtDlpDownloader(media_root)._options(format_id="134+140", max_height=360)
+
+    assert options["socket_timeout"] >= 60
+    assert options["retries"] >= 50
+    assert options["fragment_retries"] >= 50
+    assert options["continuedl"] is True
+    assert options["nopart"] is False
+    assert options["skip_unavailable_fragments"] is False
+    assert options["retry_sleep_functions"]["http"](10) == 60
+    assert options["format"] == f"134+140/{format_selector(360)}"
+
+
+def test_complete_part_files_are_finished_before_resuming(tmp_path):
+    (tmp_path / "video.f160.mp4.part").write_bytes(b"x" * 10)
+    (tmp_path / "video.f140.m4a.part").write_bytes(b"x" * 4)
+    info = {
+        "requested_formats": [
+            {"format_id": "160", "filesize": 10},
+            {"format_id": "140", "filesize": 8},
+        ]
+    }
+
+    finish_complete_parts(tmp_path, info)
+
+    assert (tmp_path / "video.f160.mp4").is_file()
+    assert (tmp_path / "video.f140.m4a.part").is_file()

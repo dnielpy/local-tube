@@ -1,3 +1,4 @@
+import errno
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -6,8 +7,58 @@ from typing import Any
 
 import yt_dlp
 from yt_dlp.extractor.youtube import YoutubeIE
+from yt_dlp.postprocessor import PostProcessor
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+# Errors that a new attempt cannot fix. Anything else (timeouts, resets, 5xx, a 403 from an
+# expired stream URL...) is worth retrying on a weak connection.
+PERMANENT_ERRORS = (
+    "private video",
+    "video unavailable",
+    "this video is unavailable",
+    "has been removed",
+    "has been terminated",
+    "copyright",
+    "members-only",
+    "join this channel",
+    "confirm your age",
+    "inappropriate for some users",
+    "sign in to confirm",
+    "cookies are no longer valid",
+    "unsupported url",
+    "is not a valid url",
+    "only single videos are supported",
+    "no space left on device",
+    "premieres in",
+    "this live event will begin",
+)
+
+# Patient enough for a slow link, but a connection that stops sending is still noticed.
+SOCKET_TIMEOUT = 60
+HTTP_CHUNK_SIZE = 10 * 1024 * 1024
+
+
+def _backoff(attempt: int) -> float:
+    return min(2**attempt, 60)
+
+
+def resilient_options() -> dict[str, Any]:
+    """Retry and resume settings for a connection that is slow and drops often."""
+    return {
+        "socket_timeout": SOCKET_TIMEOUT,
+        "retries": 50,
+        "fragment_retries": 50,
+        "extractor_retries": 10,
+        "file_access_retries": 10,
+        "retry_sleep_functions": {"http": _backoff, "fragment": _backoff, "extractor": _backoff},
+        # Keep the .part files and continue them with a Range request.
+        "continuedl": True,
+        "nopart": False,
+        # A missing fragment must fail and be retried, not leave a hole in the video.
+        "skip_unavailable_fragments": False,
+        "http_chunk_size": HTTP_CHUNK_SIZE,
+    }
 
 
 def format_selector(max_height: int | None) -> str:
@@ -22,6 +73,7 @@ class Progress:
     speed: float | None = None
     eta: int | None = None
     total_bytes: int | None = None
+    format_id: str | None = None
 
 
 @dataclass
@@ -94,7 +146,24 @@ def available_qualities(formats: list[dict[str, Any]]) -> list[Quality]:
 
 
 class DownloadError(Exception):
-    pass
+    def __init__(self, message: str, transient: bool = False) -> None:
+        super().__init__(message)
+        self.transient = transient
+
+
+def is_transient(exc: BaseException) -> bool:
+    """Whether trying again later could make this error go away."""
+    original = getattr(exc, "exc_info", None)
+    cause = original[1] if original and len(original) > 1 else exc.__cause__
+    for error in (exc, cause):
+        if isinstance(error, OSError) and error.errno == errno.ENOSPC:
+            return False
+    message = clean_error(exc).lower()
+    return not any(pattern in message for pattern in PERMANENT_ERRORS)
+
+
+def _download_error(exc: Exception) -> DownloadError:
+    return DownloadError(clean_error(exc), transient=is_transient(exc))
 
 
 class DownloadCancelled(DownloadError):
@@ -128,11 +197,16 @@ class YtDlpDownloader:
         on_progress: Callable[[Progress], None] | None = None,
         max_height: int | None = None,
         should_cancel: Callable[[], bool] = _never,
+        format_id: str | None = None,
+        reporter: "_ProgressReporter | None" = None,
     ) -> dict[str, Any]:
+        selector = format_selector(max_height)
         options: dict[str, Any] = {
             **base_options(cookies_file),
+            **resilient_options(),
             "noplaylist": True,
-            "format": format_selector(max_height),
+            # A retry reuses the streams it already started, so their .part files continue.
+            "format": f"{format_id}/{selector}" if format_id else selector,
             "merge_output_format": "mp4",
             "paths": {"home": str(self.media_root)},
             "outtmpl": {
@@ -145,7 +219,7 @@ class YtDlpDownloader:
             ],
         }
         if on_progress is not None:
-            report = _progress_hook(on_progress)
+            report = reporter or _ProgressReporter(on_progress)
 
             def progress_hook(d: dict[str, Any]) -> None:
                 if should_cancel():
@@ -167,7 +241,7 @@ class YtDlpDownloader:
             with yt_dlp.YoutubeDL(self._options(cookies_file)) as ydl:
                 info = ydl.extract_info(url, download=False, process=False)
         except yt_dlp.utils.YoutubeDLError as exc:
-            raise DownloadError(clean_error(exc)) from exc
+            raise _download_error(exc) from exc
         if info is None or info.get("_type", "video") not in ("video", "url"):
             raise DownloadError("Only single videos are supported, not playlists or channels")
         return Probe(youtube_id=info["id"], title=info.get("title"), info=info)
@@ -195,19 +269,34 @@ class YtDlpDownloader:
         max_height: int | None = None,
         should_cancel: Callable[[], bool] = _never,
         cookies_file: str | None = None,
+        format_id: str | None = None,
     ) -> DownloadResult:
-        options = self._options(cookies_file, on_progress, max_height, should_cancel)
+        reporter = _ProgressReporter(on_progress)
+        options = self._options(
+            cookies_file, on_progress, max_height, should_cancel, format_id, reporter
+        )
         try:
+
+            def selected(info: dict[str, Any]) -> None:
+                finish_complete_parts(self.media_root / info["id"], info)
+                reporter.selected(info)
+
             with yt_dlp.YoutubeDL(options) as ydl:
+                # Added after the hooks, so it does not show up as "processing".
+                ydl.add_post_processor(_SelectedFormat(selected), when="before_dl")
                 info = ydl.process_ie_result(probe.info, download=True)
         except yt_dlp.utils.DownloadCancelled as exc:
             raise DownloadCancelled("Cancelled") from exc
-        except yt_dlp.utils.YoutubeDLError as exc:
+        except (yt_dlp.utils.YoutubeDLError, OSError) as exc:
             if should_cancel():
                 raise DownloadCancelled("Cancelled") from exc
-            raise DownloadError(clean_error(exc)) from exc
+            raise _download_error(exc) from exc
 
-        video_file = Path(info["requested_downloads"][0]["filepath"])
+        downloads = info.get("requested_downloads") or []
+        video_file = Path(downloads[0]["filepath"]) if downloads else None
+        if video_file is None or not video_file.is_file() or video_file.stat().st_size == 0:
+            # The parts are still on disk, so the next attempt only redoes the merge.
+            raise DownloadError("The video file is missing after the download", transient=True)
         thumbnail = video_file.with_name("thumbnail.jpg")
         return DownloadResult(
             youtube_id=info["id"],
@@ -223,35 +312,81 @@ class YtDlpDownloader:
                 if thumbnail.is_file()
                 else None
             ),
-            file_size=video_file.stat().st_size if video_file.is_file() else None,
+            file_size=video_file.stat().st_size,
         )
 
 
-def _progress_hook(on_progress: Callable[[Progress], None]) -> Callable[[dict[str, Any]], None]:
-    finished = 0
+def finish_complete_parts(directory: Path, info: dict[str, Any]) -> None:
+    """Rename .part files that already hold the whole stream.
 
-    def hook(d: dict[str, Any]) -> None:
-        nonlocal finished
-        parts = len(d.get("info_dict", {}).get("requested_formats") or []) or 1
+    A download stopped right after its last byte leaves a full .part file. Resuming it asks
+    YouTube for a range past the end, which fails with 416 on every attempt.
+    """
+    formats = info.get("requested_formats") or [info]
+    for fmt in formats:
+        size = fmt.get("filesize")
+        if not size:
+            continue
+        tag = f".f{fmt['format_id']}" if len(formats) > 1 else ""
+        for part in directory.glob(f"video{tag}.*.part"):
+            final = part.with_suffix("")
+            if part.stat().st_size == size and not final.exists():
+                part.rename(final)
+
+
+class _ProgressReporter:
+    """Turns yt-dlp's per-stream progress into progress of the whole video."""
+
+    def __init__(self, on_progress: Callable[[Progress], None]) -> None:
+        self.on_progress = on_progress
+        self.finished = 0
+        self.parts = 1
+        self.format_id: str | None = None
+        self.total_bytes: int | None = None
+
+    def selected(self, info: dict[str, Any]) -> None:
+        # The streams of a merged format are downloaded one by one, and their progress no
+        # longer carries the combined format id ("134+140"), so it is taken before they start.
+        self.format_id = info.get("format_id")
+        self.parts = len(info.get("requested_formats") or []) or 1
+        self.total_bytes = _total_size(info)
+        self.on_progress(Progress("downloading", format_id=self.format_id))
+
+    def __call__(self, d: dict[str, Any]) -> None:
         if d["status"] == "finished":
-            finished += 1
-            on_progress(Progress("downloading", percent=min(finished / parts, 1) * 100))
+            self.finished += 1
+            self.on_progress(
+                Progress(
+                    "downloading",
+                    percent=min(self.finished / self.parts, 1) * 100,
+                    format_id=self.format_id,
+                )
+            )
             return
         if d["status"] != "downloading":
             return
         total = d.get("total_bytes") or d.get("total_bytes_estimate")
         fraction = d.get("downloaded_bytes", 0) / total if total else 0
-        on_progress(
+        self.on_progress(
             Progress(
                 "downloading",
-                percent=min((finished + fraction) / parts, 1) * 100,
+                percent=min((self.finished + fraction) / self.parts, 1) * 100,
                 speed=d.get("speed"),
                 eta=d.get("eta"),
-                total_bytes=_total_size(d.get("info_dict", {})) or (int(total) if total else None),
+                total_bytes=self.total_bytes or (int(total) if total else None),
+                format_id=self.format_id,
             )
         )
 
-    return hook
+
+class _SelectedFormat(PostProcessor):
+    def __init__(self, on_selected: Callable[[dict[str, Any]], None]) -> None:
+        super().__init__()
+        self.on_selected = on_selected
+
+    def run(self, information: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+        self.on_selected(information)
+        return [], information
 
 
 def _total_size(info: dict[str, Any]) -> int | None:
