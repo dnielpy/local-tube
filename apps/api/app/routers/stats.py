@@ -5,8 +5,8 @@ from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from app.db import SessionDep
-from app.models import DownloadJob, Profile, WatchEvent
-from app.schemas import ActiveDownloadsOut, WatchTimeOut
+from app.models import DownloadJob, JobStatus, Profile, WatchEvent
+from app.schemas import ActiveDownloadsOut, DownloadJobOut, WatchTimeOut
 from app.services.service_auth import ServiceDep
 from app.services.worker import ACTIVE_STATUSES
 
@@ -27,6 +27,32 @@ async def active_downloads(session: SessionDep) -> ActiveDownloadsOut:
         )
     )
     return ActiveDownloadsOut(count=len(jobs), items=jobs)
+
+
+@router.get(
+    "/downloads/terminal",
+    response_model=list[DownloadJobOut],
+    description=(
+        "Completed or failed jobs of every profile, ordered by update time for service monitors."
+    ),
+)
+async def terminal_downloads(
+    session: SessionDep,
+    since: Annotated[datetime, Query(description="Inclusive UTC update timestamp")],
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> list[DownloadJobOut]:
+    jobs = await session.scalars(
+        select(DownloadJob)
+        .where(
+            DownloadJob.status.in_((JobStatus.completed, JobStatus.failed)),
+            DownloadJob.updated_at >= since,
+        )
+        .order_by(DownloadJob.updated_at, DownloadJob.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return [DownloadJobOut.model_validate(job) for job in jobs]
 
 
 @router.get(

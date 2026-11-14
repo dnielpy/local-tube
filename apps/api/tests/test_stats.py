@@ -110,9 +110,35 @@ async def test_active_downloads_of_every_profile(anon_client, make_profile, prof
     assert {item["title"] for item in body["items"]} == {"One", "Two"}
 
 
+async def test_terminal_downloads_of_every_profile(anon_client, make_profile, profile):
+    other = await make_profile("Ana")
+    async with SessionLocal() as session:
+        session.add_all([
+            DownloadJob(url="u1", title="Done", status=JobStatus.completed, profile_id=profile.id),
+            DownloadJob(url="u2", title="Failed", status=JobStatus.failed, profile_id=other.id),
+            DownloadJob(
+                url="u3", title="Active", status=JobStatus.downloading, profile_id=other.id
+            ),
+        ])
+        await session.commit()
+
+    since = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+    response = await anon_client.get(
+        "/api/stats/downloads/terminal", params={"since": since}, headers=TOKEN
+    )
+
+    assert response.status_code == 200
+    assert {job["title"] for job in response.json()} == {"Done", "Failed"}
+    assert all(job["updated_at"] for job in response.json())
+
+
 @pytest.mark.parametrize("headers", [{}, {"X-Service-Token": "wrong"}])
 async def test_stats_need_the_service_token(anon_client, headers):
-    for path in ("/api/stats/watch-time", "/api/stats/downloads/active"):
+    for path in (
+        "/api/stats/watch-time",
+        "/api/stats/downloads/active",
+        "/api/stats/downloads/terminal?since=2026-11-13T00:00:00Z",
+    ):
         assert (await anon_client.get(path, headers=headers)).status_code == 403
 
 
