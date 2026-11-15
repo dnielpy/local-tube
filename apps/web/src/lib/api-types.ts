@@ -955,6 +955,7 @@ export interface components {
             reachable: boolean;
             forced_offline: boolean;
             checked_at: string | null;
+            downloads_resume_at: string | null;
         };
         StatusUpdate: {
             forced_offline: boolean;

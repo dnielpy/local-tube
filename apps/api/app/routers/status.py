@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.services import download_window
 from app.services.connectivity import connectivity
 
 router = APIRouter(prefix="/status", tags=["status"])
@@ -13,6 +14,8 @@ class StatusOut(BaseModel):
     reachable: bool
     forced_offline: bool
     checked_at: datetime | None
+    # Outside the download hours, when queued downloads start again.
+    downloads_resume_at: datetime | None
 
 
 class StatusUpdate(BaseModel):
@@ -25,6 +28,7 @@ def _status() -> StatusOut:
         reachable=connectivity.reachable,
         forced_offline=connectivity.forced_offline,
         checked_at=connectivity.checked_at,
+        downloads_resume_at=download_window.next_open(),
     )
 
 

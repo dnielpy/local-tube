@@ -11,6 +11,7 @@ os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="localtube-media-")
 os.environ["PROFILES_ROOT"] = tempfile.mkdtemp(prefix="localtube-profiles-")
 os.environ["WORKER_ENABLED"] = "false"
 os.environ["CONNECTIVITY_CHECK"] = "false"
+os.environ["DOWNLOAD_WINDOW_START"] = os.environ["DOWNLOAD_WINDOW_END"] = "00:00"
 
 import pytest
 from httpx import ASGITransport, AsyncClient

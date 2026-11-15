@@ -71,6 +71,10 @@ Everything that comes from YouTube is cached so it is fetched as rarely as possi
 
 Channel data comes from yt-dlp in flat mode: one request for all subscriptions and one per channel page, with no extra request per video. The browser never talks to YouTube directly. Every image is served by the api from its cache.
 
+### Download hours
+
+Downloads only use the network between `DOWNLOAD_WINDOW_START` and `DOWNLOAD_WINDOW_END` (01:00 to 08:00 by default, `TZ` time), so they do not fill the home network during the day. Outside those hours queued downloads wait ("En espera" on the downloads page), and one that is still running at the end pauses and continues from its partial files the next night. The same value for both lets them run at any hour.
+
 ### Auto-download
 
 In Ajustes → Autodescarga de videos you choose channels, a quality (480p by default), an hour (01:00 by default, server time) and how many videos per channel. Every day at that hour the api asks YouTube for the latest videos of each channel and queues the ones newer than the newest you already have (only the latest one when you have none from the channel), skipping premieres, live streams and videos already queued. Offline it waits and runs as soon as the connection comes back.

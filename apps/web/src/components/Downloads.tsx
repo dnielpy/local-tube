@@ -8,6 +8,7 @@ import { browser } from "react-dom";
 import { api, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
 import { formatBytes, formatClock, formatDuration, timeAgo } from "@/lib/format";
 import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
+import { useStatus } from "@/lib/use-status";
 
 import { IconButton } from "./IconButton";
 import { QualityDialog } from "./QualityDialog";
@@ -159,6 +160,8 @@ function JobRow({ job }: { job: DownloadJob }) {
   const retry = useMutation({ mutationFn: api.retryDownload, onSuccess: refresh });
   const remove = useMutation({ mutationFn: api.deleteDownload, onSuccess: refresh });
   const cancel = useMutation({ mutationFn: api.cancelDownload, onSuccess: refresh });
+  // Outside the download hours, queued downloads wait until they start again.
+  const resumeAt = useStatus().data?.downloads_resume_at;
   const active = isActiveJob(job);
   const watchHref = job.video_id ? `/watch?v=${job.video_id}` : null;
 
@@ -222,7 +225,9 @@ function JobRow({ job }: { job: DownloadJob }) {
           ? "Esperando conexión"
           : job.status === "queued" && job.start_at && new Date(job.start_at) > new Date()
             ? `Programado · ${formatClock(job.start_at)}`
-            : STATUS_LABEL[job.status],
+            : job.status === "queued" && resumeAt
+              ? `En espera · ${formatClock(resumeAt)}`
+              : STATUS_LABEL[job.status],
     job.max_height ? `${job.max_height}p` : "Máxima",
   ];
   // The partial files are kept, so a stopped download continues from here.

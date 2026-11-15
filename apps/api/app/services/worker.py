@@ -12,6 +12,7 @@ from sqlalchemy import func, or_, select, update
 
 from app.db import SessionLocal
 from app.models import DownloadJob, JobStatus, Video
+from app.services import download_window
 from app.services.connectivity import connectivity
 from app.services.downloader import (
     DownloadCancelled,
@@ -66,6 +67,7 @@ class DownloadWorker:
     ) -> None:
         self.fetch_image = fetch_image
         self._cancel: dict[uuid.UUID, threading.Event] = {}
+        self._window_closed: set[uuid.UUID] = set()
         self.downloader = downloader
         self.concurrency = concurrency
         self.on_video_added = on_video_added
@@ -106,19 +108,31 @@ class DownloadWorker:
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self._wakeup.wait(), IDLE_POLL_INTERVAL)
 
+    def _close_window(self, job_id: uuid.UUID) -> None:
+        self._window_closed.add(job_id)
+        self.cancel(job_id)
+
     async def run_once(self) -> bool:
-        if not connectivity.online:
+        if not connectivity.online or not download_window.is_open():
             return False
         claimed = await claim_next_job()
         if claimed is None:
             return False
         cancelled = self._cancel[claimed.id] = threading.Event()
         job_id = claimed.id
+        until_close = download_window.seconds_until_close()
+        closer = (
+            None
+            if until_close is None
+            else asyncio.get_running_loop().call_later(until_close, self._close_window, job_id)
+        )
         try:
             await self._process(claimed, cancelled)
         except DownloadCancelled:
             # Paused: the partial files stay, so starting it again continues where it was.
-            await _update_job(job_id, status=JobStatus.cancelled, error=None, speed=None, eta=None)
+            # Stopped by the end of the download hours, it goes back to the queue for the next ones.
+            status = JobStatus.queued if job_id in self._window_closed else JobStatus.cancelled
+            await _update_job(job_id, status=status, error=None, speed=None, eta=None)
         except DownloadError as exc:
             if exc.transient:
                 logger.warning("download %s failed, retrying later: %s", job_id, exc)
@@ -131,6 +145,9 @@ class DownloadWorker:
             logger.exception("download %s failed", job_id)
             await schedule_retry(job_id, str(exc), claimed.progress)
         finally:
+            if closer is not None:
+                closer.cancel()
+            self._window_closed.discard(job_id)
             self._cancel.pop(job_id, None)
         return True
 
