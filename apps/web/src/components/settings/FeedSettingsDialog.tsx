@@ -59,7 +59,7 @@ export function FeedSettingsDialog({ onClose }: { onClose: () => void }) {
         <div className="divide-y divide-yt-divider">
           <Option
             title="Actualizar cada"
-            description="LocalTube busca solo los videos nuevos de tus canales con esta frecuencia. Con el botón ↻ de arriba lo haces al momento."
+            description="LocalTube busca solo los videos nuevos de tus canales con esta frecuencia."
           >
             <Select
               label="Actualizar cada"

@@ -302,16 +302,20 @@ class ChannelIdsIn(BaseModel):
     channel_ids: list[str] = Field(max_length=500)
 
 
-class PendingVideos(BaseModel):
-    channel: ChannelOut
-    videos: list[RemoteVideoOut]
+DAILY_RUN_TIME = "01:00"
 
 
 class AutoDownloadSettings(BaseModel):
     max_height: int = 480
-    # "HH:MM" in the viewer's time: queued videos start downloading then. None starts them now.
-    start_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    # "HH:MM" in the server's time: every day then, the new videos of the channels are queued.
+    start_time: str = Field(default=DAILY_RUN_TIME, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     per_channel: int = Field(default=10, ge=1, le=30)
+
+    @field_validator("start_time", mode="before")
+    @classmethod
+    def daily_by_default(cls, value: str | None) -> str:
+        # Settings saved when no hour meant "start now".
+        return DAILY_RUN_TIME if value is None else value
 
     @field_validator("max_height")
     @classmethod

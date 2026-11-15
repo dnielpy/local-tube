@@ -19,7 +19,6 @@ export type WatchProgress = components["schemas"]["WatchProgressOut"];
 export type Playlist = components["schemas"]["PlaylistOut"];
 export type PlaylistDetail = components["schemas"]["PlaylistDetail"];
 export type ChannelChoice = components["schemas"]["ChannelChoiceOut"];
-export type PendingVideos = components["schemas"]["PendingVideos"];
 export type AutoDownloadSettings = components["schemas"]["AutoDownloadSettings"];
 export type Feed = components["schemas"]["FeedOut"];
 export type FeedItem = components["schemas"]["FeedItemOut"];
@@ -141,12 +140,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ channel_ids: channelIds }),
     }),
-  pendingVideos: (channelId: string, signal?: AbortSignal) =>
-    request<PendingVideos>(`/auto-download/channels/${encodeURIComponent(channelId)}/pending`, {
-      signal,
-    }),
   feed: () => request<Feed>("/feed"),
-  refreshFeed: () => request<Feed>("/feed/refresh", { method: "POST" }),
   feedSettings: () => request<FeedSettings>("/feed/settings"),
   setFeedSettings: (settings: FeedSettings) =>
     request<FeedSettings>("/feed/settings", { method: "PUT", body: JSON.stringify(settings) }),

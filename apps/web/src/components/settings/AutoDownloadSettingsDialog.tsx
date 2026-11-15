@@ -16,7 +16,7 @@ const TIMES = Array.from({ length: 48 }, (_, index) => {
   return `${hours}:${index % 2 ? "30" : "00"}`;
 });
 
-/** The auto-download options of the profile: quality, start hour, videos per channel, channels. */
+/** The auto-download options of the profile: quality, daily hour, videos per channel, channels. */
 export function AutoDownloadSettingsDialog({ onClose }: { onClose: () => void }) {
   const client = useQueryClient();
   const settings = useQuery({
@@ -61,7 +61,7 @@ export function AutoDownloadSettingsDialog({ onClose }: { onClose: () => void })
     <SettingsDialog
       title="Autodescarga de videos"
       icon={BoltIcon}
-      intro="Con el botón ⚡ de la barra de arriba, LocalTube busca los videos nuevos de tus canales y te los propone para descargar."
+      intro="Cada día, a la hora que elijas, LocalTube busca los videos nuevos de tus canales y los pone a descargar solo."
       heading={view === "channels" ? "Canales" : "Opciones"}
       onBack={view === "channels" ? () => setView("options") : undefined}
       onClose={onClose}
@@ -77,7 +77,7 @@ export function AutoDownloadSettingsDialog({ onClose }: { onClose: () => void })
         <div className="divide-y divide-yt-divider">
           <Option
             title="Calidad de descarga"
-            description="La que se elige por defecto para cada video. Si no la tiene, la más cercana por debajo."
+            description="La de cada video que se descarga. Si no la tiene, la más cercana por debajo."
           >
             <Select
               label="Calidad de descarga"
@@ -90,21 +90,14 @@ export function AutoDownloadSettingsDialog({ onClose }: { onClose: () => void })
             />
           </Option>
           <Option
-            title="Hora de inicio"
-            description={
-              values.start_time
-                ? `Los videos que elijas quedan programados y empiezan a bajar a las ${formatClock(nextAt(values.start_time))}.`
-                : "Los videos que elijas empiezan a bajar en cuanto los añades."
-            }
+            title="Hora de revisión"
+            description={`Todos los días a las ${formatClock(nextAt(values.start_time))} se buscan los videos nuevos y empiezan a bajar. Si no hay conexión, en cuanto vuelva.`}
           >
             <Select
-              label="Hora de inicio"
-              value={values.start_time ?? ""}
-              onChange={(value) => change({ start_time: value || null })}
-              options={[
-                ["", "Al momento"],
-                ...TIMES.map((time) => [time, formatClock(nextAt(time))] as [string, string]),
-              ]}
+              label="Hora de revisión"
+              value={values.start_time}
+              onChange={(value) => change({ start_time: value })}
+              options={TIMES.map((time) => [time, formatClock(nextAt(time))] as [string, string])}
             />
           </Option>
           <Option

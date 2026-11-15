@@ -58,13 +58,6 @@ export function qualityName(height: number): string {
   return "Baja";
 }
 
-/** The best quality up to `preferred`, or the lowest one when all are above it. */
-export function preferredHeight(heights: number[], preferred: number): number | null {
-  if (heights.length === 0) return null;
-  const lower = heights.filter((height) => height <= preferred);
-  return lower.length > 0 ? Math.max(...lower) : Math.min(...heights);
-}
-
 /** The next time the clock shows `time` ("HH:MM"), today or tomorrow. */
 export function nextAt(time: string, now: Date = new Date()): Date {
   const [hours, minutes] = time.split(":").map(Number);

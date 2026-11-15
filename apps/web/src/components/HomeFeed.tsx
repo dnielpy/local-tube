@@ -101,7 +101,7 @@ function FeedGrid({ feed }: { feed: Feed }) {
       <GridSkeleton />
     ) : (
       <p className="py-20 text-center text-yt-text-secondary">
-        Todavía no hay videos de los canales del feed. Actualízalo con el botón ↻ de arriba.
+        Todavía no hay videos de los canales del feed. Se actualiza solo cada pocas horas.
       </p>
     );
   }

@@ -560,22 +560,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auto-download/channels/{channel_id}/pending": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["pending_videos_api_auto_download_channels__channel_id__pending_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/feed/settings": {
         parameters: {
             query?: never;
@@ -648,6 +632,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["active_downloads_api_stats_downloads_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/downloads/terminal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["terminal_downloads_api_stats_downloads_terminal_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -754,7 +754,7 @@ export interface components {
         };
         AutoDownloadSettings: {
             max_height: number;
-            start_time?: string | null;
+            start_time: string;
             per_channel: number;
         };
         ChannelChoiceOut: {
@@ -867,10 +867,6 @@ export interface components {
             total: number;
         };
         JobStatus: "queued" | "downloading" | "processing" | "completed" | "failed" | "cancelled";
-        PendingVideos: {
-            channel: components["schemas"]["ChannelOut"];
-            videos: components["schemas"]["RemoteVideoOut"][];
-        };
         PinIn: {
             pin: string;
         };
@@ -2485,37 +2481,6 @@ export interface operations {
             };
         };
     };
-    pending_videos_api_auto_download_channels__channel_id__pending_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                channel_id: string;
-            };
-            cookie?: {
-                localtube_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PendingVideos"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_settings_api_feed_settings_get: {
         parameters: {
             query?: never;
@@ -2715,6 +2680,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActiveDownloadsOut"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminal_downloads_api_stats_downloads_terminal_get: {
+        parameters: {
+            query: {
+                since: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: {
+                "x-service-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadJobOut"][];
                 };
             };
             422: {

@@ -46,7 +46,7 @@ export function SettingsView() {
           {autoChannels.isPending
             ? "Cargando…"
             : enabled === 0
-              ? "Elige los canales cuyos videos nuevos quieres bajar con el botón ⚡"
+              ? "Elige los canales cuyos videos nuevos se bajan solos cada día"
               : `${enabled} ${enabled === 1 ? "canal" : "canales"} con autodescarga`}
         </ModuleRow>
       </section>

@@ -54,7 +54,7 @@ The api checks every minute whether it can reach YouTube (`GET https://www.youtu
 
 ### Feed
 
-In Ajustes → Feed you choose channels from your subscriptions and how often they are checked (every 6 h by default). Online, the home page then opens on the feed: the latest video of each of those channels, newest first, with "Descargado" on the ones already in your library. Premieres and live streams are skipped until they can be downloaded. The ↻ button in the top bar checks every channel right away. Offline, or with the "Todos" chip, the home page shows your downloaded videos as before.
+In Ajustes → Feed you choose channels from your subscriptions and how often they are checked (every 6 h by default). Online, the home page then opens on the feed: the latest video of each of those channels, newest first, with "Descargado" on the ones already in your library. Premieres and live streams are skipped until they can be downloaded. Offline, or with the "Todos" chip, the home page shows your downloaded videos as before.
 
 The api refreshes each profile's feed by itself once the interval passes, even when nobody has LocalTube open, so the feed is ready when you come in. A channel whose page was fetched within the interval, for example because you opened it, is not asked again.
 
@@ -66,10 +66,14 @@ Everything that comes from YouTube is cached so it is fetched as rarely as possi
 | --- | --- | --- |
 | Subscriptions | `channels` table | Every 24 h, or with ↻ |
 | A channel's latest 10 videos and its info | `channels`, `channel_videos` | When the page is opened and the cache is older than 6 h, or with "Actualizar" |
-| The feed's channels | `channels`, `channel_videos` | Every feed interval (6 h by default), or with ↻ |
+| The feed's channels | `channels`, `channel_videos` | Every feed interval (6 h by default) |
 | Avatars (176 px), banners (1280 px wide) and thumbnails (320×180) | `MEDIA_PATH/.cache/` | Only when YouTube changes the image |
 
 Channel data comes from yt-dlp in flat mode: one request for all subscriptions and one per channel page, with no extra request per video. The browser never talks to YouTube directly. Every image is served by the api from its cache.
+
+### Auto-download
+
+In Ajustes → Autodescarga de videos you choose channels, a quality (480p by default), an hour (01:00 by default, server time) and how many videos per channel. Every day at that hour the api asks YouTube for the latest videos of each channel and queues the ones newer than the newest you already have (only the latest one when you have none from the channel), skipping premieres, live streams and videos already queued. Offline it waits and runs as soon as the connection comes back.
 
 ## Development
 

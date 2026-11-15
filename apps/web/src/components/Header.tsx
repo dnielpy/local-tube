@@ -5,10 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 
 import { IconButton } from "./IconButton";
-import { AutoDownloadButton } from "./AutoDownloadButton";
 import { DownloadsButton, DownloadsButtonFallback } from "./DownloadsButton";
-import { FeedButton } from "./FeedButton";
-import { LibraryToggle } from "./LibraryToggle";
 import { BackIcon, CloseIcon, Logo, MenuIcon, SearchIcon } from "./icons";
 import { ProfileMenu } from "./profiles/ProfileMenu";
 
@@ -99,9 +96,6 @@ export function Header({ onMenu }: { onMenu: () => void }) {
         <IconButton label="Buscar" className="search:hidden" onClick={() => setMobileSearch(true)}>
           <SearchIcon />
         </IconButton>
-        <LibraryToggle />
-        <FeedButton />
-        <AutoDownloadButton />
         <Suspense fallback={<DownloadsButtonFallback />}>
           <DownloadsButton />
         </Suspense>

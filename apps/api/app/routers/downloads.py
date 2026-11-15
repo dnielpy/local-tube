@@ -12,8 +12,9 @@ from app.media import media_path, remove_video_dir
 from app.models import DownloadJob, JobStatus, Profile, Video
 from app.schemas import DownloadCreate, DownloadJobOut, QualityOut, VideoFormatsOut
 from app.services.connectivity import connectivity
-from app.services.downloader import DownloadError, Quality, YtDlpDownloader, parse_youtube_id
-from app.services.library import library_video, link_video
+from app.services.downloader import DownloadError, Quality, YtDlpDownloader
+from app.services.downloads import AlreadyInLibrary, AlreadyQueued, queue_download
+from app.services.library import library_video
 from app.services.profiles import ProfileDep, cookies_path
 from app.services.worker import ACTIVE_STATUSES, DownloadWorker
 
@@ -84,79 +85,35 @@ async def video_formats(
     )
 
 
-async def _link_downloaded(
-    session: SessionDep, profile: Profile, url: str, video: Video
-) -> DownloadJob:
-    """Another profile already downloaded this video: add the same file to this library."""
-    await link_video(session, profile.id, video.id)
-    job = DownloadJob(
-        url=url,
-        youtube_id=video.youtube_id,
-        profile_id=profile.id,
-        status=JobStatus.completed,
-        progress=100,
-        title=video.title,
-        duration_seconds=video.duration_seconds,
-        size_bytes=video.file_size,
-        thumbnail_path=video.thumbnail_path,
-        video_id=video.id,
-    )
-    session.add(job)
-    await session.commit()
-    await session.refresh(job)
-    return job
-
-
 @router.post("", response_model=DownloadJobOut, status_code=status.HTTP_201_CREATED)
 async def create_download(
     body: DownloadCreate, session: SessionDep, worker: WorkerDep, profile: ProfileDep
 ) -> DownloadJob:
-    url = _validate_url(body.url)
-
-    youtube_id = parse_youtube_id(url)
-    if youtube_id is not None:
-        video = await library_video(session, profile.id, youtube_id)
-        if video is not None:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                {"message": "This video is already in the library", "video_id": str(video.id)},
-            )
-        video = await session.scalar(select(Video).where(Video.youtube_id == youtube_id))
-        if video is not None:
-            return await _link_downloaded(session, profile, url, video)
-
-    active = await session.scalar(
-        select(DownloadJob).where(
-            DownloadJob.profile_id == profile.id,
-            DownloadJob.url == url,
-            DownloadJob.status.in_(ACTIVE_STATUSES),
-        )
-    )
-    if active is not None:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            {"message": "This video is already being downloaded", "job_id": str(active.id)},
-        )
-
     max_height = (
         body.max_height
         if "max_height" in body.model_fields_set
         else get_settings().default_max_height
     )
-    job = DownloadJob(
-        url=url,
-        youtube_id=youtube_id,
-        max_height=max_height,
-        start_at=body.start_at,
-        title=body.title,
-        profile_id=profile.id,
-    )
-    session.add(job)
-    await session.commit()
-    await session.refresh(job)
-    if worker is not None:
-        worker.notify()
-    return job
+    try:
+        return await queue_download(
+            session,
+            worker,
+            profile.id,
+            _validate_url(body.url),
+            max_height,
+            title=body.title,
+            start_at=body.start_at,
+        )
+    except AlreadyInLibrary as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"message": "This video is already in the library", "video_id": str(exc.video.id)},
+        ) from exc
+    except AlreadyQueued as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"message": "This video is already being downloaded", "job_id": str(exc.job.id)},
+        ) from exc
 
 
 @router.get("", response_model=list[DownloadJobOut])

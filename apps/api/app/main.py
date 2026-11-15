@@ -18,6 +18,7 @@ from app.routers import (
     status,
     videos,
 )
+from app.services.auto_download import keep_auto_downloading
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity, youtube_probe
 from app.services.downloader import YtDlpDownloader
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.downloader = downloader
     worker = None
     backfill = None
+    auto_download_sweep = None
     if settings.worker_enabled:
         worker = DownloadWorker(
             downloader,
@@ -57,6 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 lambda url: downloader.probe(url).info.get("channel_id")
             )
         )
+        auto_download_sweep = asyncio.create_task(keep_auto_downloading(channel_service, worker))
     media_sweep = asyncio.create_task(channel_service.keep_channel_media())
     feed_sweep = asyncio.create_task(channel_service.keep_feeds_fresh())
     app.state.worker = worker
@@ -65,6 +68,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     media_sweep.cancel()
     if backfill is not None:
         backfill.cancel()
+    if auto_download_sweep is not None:
+        auto_download_sweep.cancel()
     if worker is not None:
         await worker.stop()
     await connectivity.stop()
