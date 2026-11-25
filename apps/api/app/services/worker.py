@@ -109,8 +109,17 @@ class DownloadWorker:
                     await asyncio.wait_for(self._wakeup.wait(), IDLE_POLL_INTERVAL)
 
     def _close_window(self, job_id: uuid.UUID) -> None:
+        if download_window.state.any_hour:
+            return
         self._window_closed.add(job_id)
         self.cancel(job_id)
+
+    def close_window(self) -> None:
+        """Sends the running downloads back to the queue when the download hours are over."""
+        if download_window.is_open():
+            return
+        for job_id in list(self._cancel):
+            self._close_window(job_id)
 
     async def run_once(self) -> bool:
         if not connectivity.online or not download_window.is_open():

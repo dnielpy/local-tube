@@ -8,7 +8,7 @@ import { browser } from "react-dom";
 import { api, queryKeys, type DownloadJob, type JobStatus } from "@/lib/api";
 import { formatBytes, formatClock, formatDuration, timeAgo } from "@/lib/format";
 import { isActiveJob, useDownloadJobs } from "@/lib/use-downloads";
-import { useStatus } from "@/lib/use-status";
+import { useSetDownloadsAnyHour, useStatus } from "@/lib/use-status";
 
 import { IconButton } from "./IconButton";
 import { QualityDialog } from "./QualityDialog";
@@ -48,7 +48,10 @@ export function Downloads() {
       </p>
       <DownloadForm />
 
-      <h2 className="mt-10 mb-4 text-xl leading-7 font-bold">Historial</h2>
+      <div className="mt-10 mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl leading-7 font-bold">Historial</h2>
+        <DownloadNowSwitch />
+      </div>
       {jobs.isPending ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }, (_, index) => (
@@ -142,6 +145,45 @@ function DownloadForm() {
         onQueued={() => setUrl("")}
       />
     </form>
+  );
+}
+
+/** Lets downloads run now instead of waiting for the download hours at night. */
+function DownloadNowSwitch() {
+  const status = useStatus();
+  const setAnyHour = useSetDownloadsAnyHour();
+  const on = status.data?.downloads_any_hour ?? false;
+  const resumeAt = status.data?.downloads_resume_at;
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={!status.data || setAnyHour.isPending}
+      onClick={() => setAnyHour.mutate(!on)}
+      title={
+        on
+          ? "Las descargas no esperan a la noche"
+          : resumeAt
+            ? `Sin activarlo, las descargas empiezan a las ${formatClock(resumeAt)}`
+            : "Las descargas siguen a cualquier hora mientras esté activado"
+      }
+      className="flex h-9 items-center gap-3 rounded-full bg-yt-surface px-4 text-sm font-medium hover:bg-yt-surface-hover disabled:opacity-50"
+    >
+      <span>Descargar ahora</span>
+      <span
+        className={`relative h-[14px] w-9 rounded-full transition-colors ${
+          on ? "bg-[#3ea6ff]/50" : "bg-[#717171]"
+        }`}
+      >
+        <span
+          className={`absolute top-1/2 size-5 -translate-y-1/2 rounded-full shadow transition-all ${
+            on ? "left-4 bg-[#3ea6ff]" : "left-0 bg-[#f1f1f1]"
+          }`}
+        />
+      </span>
+    </button>
   );
 }
 

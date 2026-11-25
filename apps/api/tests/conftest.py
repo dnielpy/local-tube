@@ -23,6 +23,7 @@ from app.main import app
 from app.models import Base, Profile, Video
 from app.routers.channels import get_channel_service
 from app.routers.profiles import get_youtube_cookies
+from app.services import download_window
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity
 from app.services.library import link_video
@@ -43,6 +44,7 @@ async def schema() -> AsyncIterator[None]:
 async def clean_tables(channel_service: ChannelService) -> AsyncIterator[None]:
     connectivity.reachable = True
     connectivity.forced_offline = False
+    download_window.state.any_hour = False
     pin_guard._attempts.clear()
     shutil.rmtree(get_settings().media_root / ".cache", ignore_errors=True)
     yield

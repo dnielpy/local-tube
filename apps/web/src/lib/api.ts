@@ -86,6 +86,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ forced_offline: forcedOffline }),
     }),
+  setDownloadsAnyHour: (anyHour: boolean) =>
+    request<Status>("/status", {
+      method: "PUT",
+      body: JSON.stringify({ downloads_any_hour: anyHour }),
+    }),
   channels: () => request<ChannelList>("/channels"),
   syncChannels: () => request<ChannelList>("/channels/sync", { method: "POST" }),
   channel: (id: string, refresh = false) =>

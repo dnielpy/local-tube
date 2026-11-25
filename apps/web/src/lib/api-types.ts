@@ -956,9 +956,11 @@ export interface components {
             forced_offline: boolean;
             checked_at: string | null;
             downloads_resume_at: string | null;
+            downloads_any_hour: boolean;
         };
         StatusUpdate: {
-            forced_offline: boolean;
+            forced_offline?: boolean | null;
+            downloads_any_hour?: boolean | null;
         };
         ValidationError: {
             loc: (string | number)[];

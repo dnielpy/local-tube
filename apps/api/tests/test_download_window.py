@@ -85,3 +85,40 @@ async def test_a_running_download_goes_back_to_the_queue_when_the_window_ends(
 async def test_status_says_when_downloads_resume(client, window):
     window("00:00", "00:00")
     assert (await client.get("/api/status")).json()["downloads_resume_at"] is None
+
+
+async def test_downloads_any_hour_opens_the_window_and_persists(client, window):
+    window("01:00", "08:00")
+
+    body = (await client.put("/api/status", json={"downloads_any_hour": True})).json()
+
+    assert body["downloads_any_hour"] is True
+    assert body["downloads_resume_at"] is None
+    assert body["forced_offline"] is False
+    assert download_window.is_open(at(14))
+    assert download_window.seconds_until_close(at(7, 30)) is None
+    download_window.state.any_hour = False
+    await download_window.load()
+    assert download_window.state.any_hour is True
+
+    await client.put("/api/status", json={"downloads_any_hour": False})
+    assert not download_window.is_open(at(14))
+
+
+async def test_switching_any_hour_off_sends_a_running_download_back_to_the_queue(
+    client, media_root, window, monkeypatch
+):
+    window("01:00", "08:00")
+    await client.put("/api/status", json={"downloads_any_hour": True})
+    job = (await client.post("/api/downloads", json={"url": URL})).json()
+    downloader = SlowDownloader(media_root)
+    worker = DownloadWorker(downloader)
+    running = asyncio.create_task(worker.run_once())
+    await asyncio.to_thread(downloader.started.wait, 5)
+
+    await download_window.set_any_hour(False)
+    monkeypatch.setattr(download_window, "is_open", lambda now=None: False)
+    worker.close_window()
+    await asyncio.wait_for(running, 5)
+
+    assert (await client.get(f"/api/downloads/{job['id']}")).json()["status"] == "queued"

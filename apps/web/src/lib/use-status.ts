@@ -27,6 +27,17 @@ export function useSetForcedOffline() {
   });
 }
 
+export function useSetDownloadsAnyHour() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.setDownloadsAnyHour,
+    onSuccess: (status) => {
+      client.setQueryData(queryKeys.status, status);
+      client.invalidateQueries({ queryKey: queryKeys.downloads });
+    },
+  });
+}
+
 export function useRefetchOnStatusChange() {
   const client = useQueryClient();
   const online = useStatus().data?.online;

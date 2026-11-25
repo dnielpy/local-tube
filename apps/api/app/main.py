@@ -18,6 +18,7 @@ from app.routers import (
     status,
     videos,
 )
+from app.services import download_window
 from app.services.auto_download import keep_auto_downloading
 from app.services.channels import ChannelService
 from app.services.connectivity import connectivity, youtube_probe
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     else:
         await connectivity.load()
+    await download_window.load()
     channel_service = ChannelService(YtDlpYouTubeClient())
     app.state.channel_service = channel_service
     app.state.youtube_cookies = YouTubeCookies()

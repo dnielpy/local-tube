@@ -7,6 +7,26 @@ from its partial files when they start again. The same start and end means any h
 from datetime import datetime, time, timedelta
 
 from app.config import get_settings
+from app.settings_store import read_setting, write_setting
+
+ANY_HOUR_KEY = "downloads_any_hour"
+
+
+class _State:
+    # Switched on from the downloads page: downloads run now, whatever the hour.
+    any_hour = False
+
+
+state = _State()
+
+
+async def load() -> None:
+    state.any_hour = (await read_setting(ANY_HOUR_KEY)) == "true"
+
+
+async def set_any_hour(value: bool) -> None:
+    await write_setting(ANY_HOUR_KEY, "true" if value else "false")
+    state.any_hour = value
 
 
 def _bounds() -> tuple[time, time]:
@@ -24,7 +44,7 @@ def _now() -> datetime:
 def is_open(now: datetime | None = None) -> bool:
     now = now or _now()
     start, end = _bounds()
-    if start == end:
+    if start == end or state.any_hour:
         return True
     current = now.time().replace(tzinfo=None)
     if start < end:
@@ -48,6 +68,6 @@ def seconds_until_close(now: datetime | None = None) -> float | None:
     """How long downloads may keep going, or None when they never have to stop."""
     now = now or _now()
     start, end = _bounds()
-    if start == end:
+    if start == end or state.any_hour:
         return None
     return (_next(end, now) - now).total_seconds()
