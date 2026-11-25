@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -19,6 +20,7 @@ import { resumePosition, useRecordWatch } from "@/lib/watch-progress";
 import {
   ChevronRightIcon,
   FullscreenExitIcon,
+  MiniplayerIcon,
   FullscreenIcon,
   NextIcon,
   PauseIcon,
@@ -31,6 +33,7 @@ import {
   VolumeLowIcon,
   VolumeMutedIcon,
 } from "../icons";
+import { usePlayback } from "./playback";
 import { ProgressBar } from "./ProgressBar";
 import { SettingsMenu } from "./SettingsMenu";
 
@@ -61,6 +64,7 @@ export function Player({
   startAt,
   onChapterChange,
   onOpenChapters,
+  onMiniplayer,
   ref,
 }: {
   video: Video;
@@ -71,12 +75,17 @@ export function Player({
   startAt?: number;
   onChapterChange?: (index: number) => void;
   onOpenChapters?: () => void;
+  /** Leaves the watch page with the video playing in the mini player. */
+  onMiniplayer?: () => void;
   ref?: Ref<PlayerHandle>;
 }) {
   const queryClient = useQueryClient();
   const recordWatch = useRecordWatch();
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playback = usePlayback();
+  // The shared element of the app, so the video keeps playing in the mini player after this page.
+  const videoRef = useRef<HTMLVideoElement>(playback.element);
+  const slotRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const [playing, setPlaying] = useState(false);
@@ -237,10 +246,16 @@ export function Player({
     };
   }, [video.id, recordWatch]);
 
+  // Whether this player loaded the video, and still has to start it where the profile left it.
+  const loadingRef = useRef(false);
+
   function onLoadedMetadata() {
     const v = el();
     if (!v) return;
     setDuration(v.duration);
+    // The element is shared: a mini player that kept playing has nothing to resume.
+    if (!loadingRef.current) return;
+    loadingRef.current = false;
     v.playbackRate = rate;
     // Start where the profile left the video, as YouTube does.
     const start =
@@ -261,6 +276,72 @@ export function Player({
       }
     }
   }
+
+  // Every render sees the latest props; the element's listeners call through this.
+  const handlers = {
+    loadedmetadata: onLoadedMetadata,
+    timeupdate: () => setCurrent(el()?.currentTime ?? 0),
+    progress: onProgress,
+    play: () => {
+      setPlaying(true);
+      setEnded(false);
+      showControls();
+    },
+    pause: () => setPlaying(false),
+    ended: () => {
+      setPlaying(false);
+      setEnded(true);
+      const v = el();
+      if (v) recordWatch(video.id, v.duration, v.duration);
+    },
+    waiting: () => setWaiting(true),
+    playing: () => setWaiting(false),
+    canplay: () => setWaiting(false),
+    ratechange: () => setRate(el()?.playbackRate ?? 1),
+  };
+  const handlersRef = useRef(handlers);
+  useLayoutEffect(() => {
+    handlersRef.current = handlers;
+  });
+
+  // Takes the shared element into this player: it loads the video, or carries on with the one the
+  // mini player is showing.
+  useLayoutEffect(() => {
+    const v = videoRef.current;
+    const slot = slotRef.current;
+    if (!slot) return;
+    const fresh = playback.take(video);
+    slot.appendChild(v);
+    const names = Object.keys(handlersRef.current) as (keyof typeof handlers)[];
+    const listeners = names.map((name) => {
+      const listener = () => handlersRef.current[name]();
+      v.addEventListener(name, listener);
+      return [name, listener] as const;
+    });
+    if (fresh) {
+      loadingRef.current = true;
+      playback.resetRate();
+    } else if (v.readyState < HTMLMediaElement.HAVE_METADATA) {
+      // Taken again before it loaded (React runs effects twice in development).
+      loadingRef.current = true;
+    } else {
+      loadingRef.current = false;
+      setCurrent(v.currentTime);
+      if (Number.isFinite(v.duration)) setDuration(v.duration);
+      setPlaying(!v.paused && !v.ended);
+      setEnded(v.ended);
+      setRate(v.playbackRate);
+      onProgress();
+      if (startAt != null) v.currentTime = startAt;
+      if (v.paused && playback.wasPlaying) v.play().catch(() => {});
+    }
+    return () => {
+      listeners.forEach(([name, listener]) => v.removeEventListener(name, listener));
+      playback.release();
+    };
+    // Each video gets its own Player (keyed by id), so this runs once per video.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playback]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
@@ -334,6 +415,10 @@ export function Player({
           case "t":
             onToggleTheater();
             return true;
+          case "i":
+            if (!onMiniplayer || document.fullscreenElement) return false;
+            onMiniplayer();
+            return true;
           case "home":
             seekTo(0);
             return true;
@@ -364,6 +449,7 @@ export function Player({
     toggleMute,
     toggleFullscreen,
     onToggleTheater,
+    onMiniplayer,
     onNext,
     changeRate,
     flashToast,
@@ -409,33 +495,7 @@ export function Player({
       onMouseMove={showControls}
       onMouseLeave={() => playing && !settingsOpen && setControlsVisible(false)}
     >
-      <video
-        ref={videoRef}
-        src={video.stream_url}
-        poster={video.thumbnail_url ?? undefined}
-        preload="metadata"
-        playsInline
-        className="absolute inset-0 size-full object-contain"
-        onLoadedMetadata={onLoadedMetadata}
-        onTimeUpdate={(event) => setCurrent(event.currentTarget.currentTime)}
-        onProgress={onProgress}
-        onPlay={() => {
-          setPlaying(true);
-          setEnded(false);
-          showControls();
-        }}
-        onPause={() => setPlaying(false)}
-        onEnded={() => {
-          setPlaying(false);
-          setEnded(true);
-          const v = el();
-          if (v) recordWatch(video.id, v.duration, v.duration);
-        }}
-        onWaiting={() => setWaiting(true)}
-        onPlaying={() => setWaiting(false)}
-        onCanPlay={() => setWaiting(false)}
-        onRateChange={(event) => setRate(event.currentTarget.playbackRate)}
-      />
+      <div ref={slotRef} className="absolute inset-0" />
 
       <div
         className="absolute inset-0"
@@ -571,6 +631,11 @@ export function Player({
             )}
 
             <div className="ml-auto flex shrink-0 items-center">
+              {onMiniplayer && !fullscreen && (
+                <ControlButton label="Reproductor en miniatura (i)" onClick={onMiniplayer}>
+                  <MiniplayerIcon size={36} />
+                </ControlButton>
+              )}
               <ControlButton
                 label="Configuración"
                 onClick={() => setSettingsOpen((value) => !value)}

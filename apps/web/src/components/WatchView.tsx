@@ -28,6 +28,7 @@ import {
 import { playHref } from "./library/PlaylistView";
 import { SaveDialog } from "./library/SaveDialog";
 import { VideoRow } from "./library/VideoRow";
+import { usePlayback } from "./player/playback";
 import { Player, type PlayerHandle } from "./player/Player";
 import { ShareDialog } from "./ShareDialog";
 import { WatchNext, WatchNextSkeleton } from "./WatchNext";
@@ -42,6 +43,7 @@ export function WatchView() {
   // ?t=90s or ?t=90, the link a description timestamp copies, as on YouTube.
   const startAt = Number.parseInt(params.get("t") ?? "", 10) || undefined;
   const router = useRouter();
+  const playback = usePlayback();
   const playlist = useQuery({
     queryKey: queryKeys.playlist(listId ?? ""),
     queryFn: () => api.playlist(listId ?? ""),
@@ -137,6 +139,7 @@ export function WatchView() {
       startAt={startAt}
       onChapterChange={setChapterIndex}
       onOpenChapters={() => setChaptersOpen(true)}
+      onMiniplayer={() => router.push(playback.lastPage)}
       ref={playerRef}
     />
   ) : (

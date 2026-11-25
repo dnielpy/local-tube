@@ -168,6 +168,13 @@ body {
   }
 }
 
+@keyframes yt-mini-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
 @keyframes yt-spin {
   to {
     transform: rotate(360deg);
