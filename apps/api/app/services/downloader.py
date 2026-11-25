@@ -39,8 +39,9 @@ SOCKET_TIMEOUT = 60
 HTTP_CHUNK_SIZE = 10 * 1024 * 1024
 
 
-def _backoff(attempt: int) -> float:
-    return min(2**attempt, 60)
+def _backoff(n: int) -> float:
+    # yt-dlp calls it with the retry number as the keyword n.
+    return min(2**n, 60)
 
 
 def resilient_options() -> dict[str, Any]:
